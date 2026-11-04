@@ -1,0 +1,27 @@
+# Virtual Orange Pi:   docker compose up --build        then open http://localhost:8080
+# Benchmark on it:     docker compose run --rm orangepi echosense bench
+# Tests on it:         docker compose run --rm orangepi /opt/echosense/venv/bin/pytest -q /opt/echosense/src/tests
+# Shell on it:         docker compose exec orangepi bash
+services:
+  orangepi:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.orangepi
+    image: echosense/orangepi5:dev
+    platform: linux/arm64
+    hostname: orangepi5
+    ports:
+      - "8080:8080"
+    # Resource limits of an Orange Pi 5 (8 cores: 4x A76 + 4x A55, 4-16 GB). Docker can cap
+    # core count and memory but not per-core speed, so timings here are for comparing builds;
+    # confirm them on the board.
+    cpus: "${OPI_CPUS:-4}"
+    mem_limit: "${OPI_MEM:-4g}"
+    environment:
+      - ECHOSENSE_PROFILE=orangepi5
+    volumes:
+      - opi-home:/home/orangepi   # settings + session logs survive restarts, like the board's SD card
+    restart: unless-stopped
+
+volumes:
+  opi-home: {}

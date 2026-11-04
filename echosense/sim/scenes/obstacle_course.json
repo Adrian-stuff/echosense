@@ -1,0 +1,17 @@
+{
+  "name": "Controlled obstacle course",
+  "description": "Enclosed pre-measured course for the controlled trials: box, thin pole, head-height board, low box and a step-down, all at fixed coordinates.",
+  "ground": "concrete",
+  "start": {"x": 0.0, "z": 0.0, "yaw": 0.0},
+  "route": [[0.0, 0.0], [-0.6, 2.2], [-0.6, 3.8], [0.5, 4.6], [0.5, 5.4], [-0.6, 6.4], [-0.6, 7.6], [0.6, 8.4], [0.6, 9.4], [0.0, 10.0]],
+  "objects": [
+    {"type": "box", "name": "Left wall", "x": -3.0, "z": 5.0, "w": 0.2, "h": 2.5, "d": 13.0, "material": "concrete"},
+    {"type": "box", "name": "Right wall", "x": 3.0, "z": 5.0, "w": 0.2, "h": 2.5, "d": 13.0, "material": "concrete"},
+    {"type": "box", "name": "End wall", "x": 0.0, "z": 11.5, "w": 6.2, "h": 2.5, "d": 0.2, "material": "concrete"},
+    {"type": "box", "name": "Box obstacle", "x": 0.3, "z": 3.0, "w": 0.6, "h": 1.0, "d": 0.6, "material": "wood"},
+    {"type": "cylinder", "name": "Thin pole", "x": -0.3, "z": 5.0, "r": 0.05, "y1": 2.0, "material": "metal"},
+    {"type": "box", "name": "Head-height board", "x": 0.1, "z": 7.0, "w": 0.9, "h": 0.3, "d": 0.03, "y0": 1.5, "material": "wood"},
+    {"type": "box", "name": "Low box", "x": -0.1, "z": 9.0, "w": 0.6, "h": 0.3, "d": 0.4, "material": "fabric"},
+    {"type": "pit", "name": "Step down", "x0": 1.6, "x1": 2.9, "z0": 6.0, "z1": 8.0, "depth": 0.2}
+  ]
+}

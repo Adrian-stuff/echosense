@@ -1,0 +1,10 @@
+# Linux hosts only: pass a real Kinect v2 through to the virtual Orange Pi.
+#   docker compose -f docker-compose.yml -f docker/docker-compose.kinect-linux.yml up
+# (Docker Desktop on macOS/Windows cannot pass USB devices into containers.)
+services:
+  orangepi:
+    privileged: true
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    volumes:
+      - /dev/bus/usb:/dev/bus/usb

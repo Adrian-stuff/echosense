@@ -1,0 +1,15 @@
+[Unit]
+Description=Echo-Sense assistive device (depth sensor to 3D audio)
+After=sound.target network.target
+Wants=sound.target
+
+[Service]
+User=@USER@
+Environment=ECHOSENSE_PROFILE=orangepi5
+ExecStart=/opt/echosense/venv/bin/echosense run --source auto --no-browser
+Restart=always
+RestartSec=2
+Nice=-5
+
+[Install]
+WantedBy=multi-user.target

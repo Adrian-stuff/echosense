@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.egg-info/
+native/build/
+logs/
+reports/
+*.esd
+.claude/test-settings.json

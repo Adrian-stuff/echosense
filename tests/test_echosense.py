@@ -1,0 +1,265 @@
+"""Echo-Sense test-suite. Runs on the laptop, in the Docker virtual Orange Pi, and on the board."""
+from __future__ import annotations
+
+import math
+import os
+import time
+
+import numpy as np
+import pytest
+
+from echosense.audio.engine import AudioEngine
+from echosense.audio.hrtf import StructuralHRTF, itd_ild
+from echosense.audio.sonify import Sonifier
+from echosense.config import load_config
+from echosense.device.monitors import HealthMonitor
+from echosense.device.settings import SettingsStore
+from echosense.device.training import Trainer
+from echosense.processing.pipeline import DepthProcessor
+from echosense.sensors.base import DepthFrame
+from echosense.sensors.kinect2 import find_bridge
+from echosense.sensors.replay import Recorder, ReplaySource, read_recording
+from echosense.sensors.simulated import SimulatedKinect
+from echosense.tools.protocol import lab_scene
+
+
+@pytest.fixture
+def cfg():
+    return load_config()
+
+
+def scene(*objects, ground="concrete"):
+    return {"id": "t", "name": "test", "ground": ground, "start": {"x": 0, "z": 0, "yaw": 0}, "objects": list(objects)}
+
+
+def run(cfg, sc, frames=5, seed=1, **sim_kw):
+    sim = SimulatedKinect(cfg, sc, seed=seed)
+    sim.head_bob = False
+    for k, v in sim_kw.items():
+        setattr(sim, k, v)
+    proc = DepthProcessor(cfg)
+    proc.set_mount(cfg["sensor"]["mount_height"], cfg["sensor"]["mount_pitch_deg"])
+    res = None
+    for i in range(frames):
+        depth, extra = sim.capture(i / 30)
+        res = proc.process(DepthFrame(depth, i / 30, i + 1, sim.intrinsics, "sim", extra), 4.5, True)
+    return sim, proc, res
+
+
+# ----------------------------------------------------------------- sensor model
+def test_sim_floor_depth_matches_geometry(cfg):
+    sim = SimulatedKinect(cfg, scene(), seed=0)
+    sim.head_bob = False
+    depth, _ = sim.capture(0)
+    o, R, _ = sim.sensor_pose()
+    v = 400  # a row that sees the floor
+    d = sim.cam.dirs[v, 256] @ R.T
+    expected = -o[1] / d[1]
+    assert abs(float(np.median(depth[v, 250:262])) - expected) < 0.01
+
+
+def test_sim_invalid_outside_range(cfg):
+    sim = SimulatedKinect(cfg, scene(), seed=0)
+    depth, _ = sim.capture(0)
+    valid = depth[depth > 0]
+    assert valid.min() >= cfg["sensor"]["min_depth"] and valid.max() <= cfg["sensor"]["max_depth"]
+    assert (depth[:20] == 0).all()  # top rows look over the floor into empty space
+
+
+def test_glass_is_partly_transparent(cfg):
+    conc = run(cfg, lab_scene(2.0, 0, "concrete"), frames=1)[0].capture(0)[0]
+    glass = run(cfg, lab_scene(2.0, 0, "glass"), frames=1)[0].capture(0)[0]
+    centre = (slice(150, 170), slice(250, 262))
+    hit = lambda d: float(((d[centre] > 1.9) & (d[centre] < 2.1)).mean())  # noqa: E731
+    assert hit(conc) > 0.9 and hit(glass) < 0.4
+
+
+# ------------------------------------------------------------------- processing
+@pytest.mark.parametrize("d", [1.0, 2.0, 3.0, 4.0])
+def test_distance_error_within_15cm(cfg, d):
+    _, _, res = run(cfg, lab_scene(d, 0, "concrete"))
+    hits = [o for o in res.reported if abs(o["az"]) < 10]
+    assert hits, f"panel at {d} m not detected"
+    assert abs(hits[0]["r"] - d) < 0.15
+
+
+@pytest.mark.parametrize("az", [-30, -15, 15, 30])
+def test_bearing(cfg, az):
+    _, _, res = run(cfg, lab_scene(2.0, az, "concrete"))
+    assert any(abs(o["az"] - az) < 5 for o in res.reported)
+
+
+def test_no_false_positives_on_open_ground(cfg):
+    sim = SimulatedKinect(cfg, "open_area", seed=4)
+    proc = DepthProcessor(cfg)
+    fp = 0
+    for i in range(60):
+        sim.step_phase = i * 0.4  # walking bob without moving
+        depth, _ = sim.capture(i / 30)
+        res = proc.process(DepthFrame(depth, i / 30, i + 1, sim.intrinsics, "sim"), 4.0, True)
+        fp += bool(res.reported)
+    assert fp == 0
+
+
+def test_confirmation_suppresses_single_frame_detections(cfg):
+    sim = SimulatedKinect(cfg, lab_scene(2.0, 0, "concrete"), seed=1)
+    proc = DepthProcessor(cfg)
+    n = cfg["processing"]["confirm_frames"]
+    for i in range(n):
+        res = proc.process(DepthFrame(sim.capture(i / 30)[0], i / 30, i + 1, sim.intrinsics, "sim"), 4.0)
+        assert bool(res.reported) == (i == n - 1)
+
+
+def test_head_level_overhang(cfg):
+    board = {"type": "box", "name": "sign", "x": 0, "z": 2.12, "w": 0.8, "h": 0.3, "d": 0.04, "y0": 1.5, "material": "wood"}
+    _, _, res = run(cfg, scene(board))
+    assert [o["kind"] for o in res.reported] == ["head"]
+    assert abs(res.reported[0]["r"] - 2.0) < 0.1
+
+
+def test_low_obstacle(cfg):
+    box = {"type": "box", "name": "curb", "x": 0, "z": 2.32, "w": 0.6, "h": 0.3, "d": 0.4, "material": "concrete"}
+    _, _, res = run(cfg, scene(box))
+    assert res.reported and res.reported[0]["kind"] == "low"
+
+
+def test_drop_off_lip_distance(cfg):
+    pit = {"type": "pit", "name": "drain", "x0": -0.6, "x1": 0.6, "z0": 2.12, "z1": 2.8, "depth": 0.5}
+    _, _, res = run(cfg, scene(pit))
+    drops = [o for o in res.reported if o["kind"] == "drop"]
+    assert drops and abs(drops[0]["r"] - 2.0) < 0.12
+
+
+def test_ground_plane_estimates_mount_pitch(cfg):
+    sim = SimulatedKinect(cfg, scene(), seed=2)
+    sim.head_bob = False
+    sim.mount_pitch = -14.0  # sensor actually tilted 4 deg more than configured
+    sim.mount_height = 1.30
+    proc = DepthProcessor(cfg)  # still believes -10 deg, 1.25 m
+    for i in range(10):
+        proc.process(DepthFrame(sim.capture(i / 30)[0], i / 30, i + 1, sim.intrinsics, "sim"), 4.0)
+    g = proc.ground_info()
+    assert g["ok"] and abs(g["pitch"] - -14.0) < 0.8 and abs(g["height"] - 1.30) < 0.04
+
+
+def test_corridor_filter(cfg):
+    pole = {"type": "cylinder", "name": "pole", "x": 1.2, "z": 2.0, "r": 0.1, "y1": 2.5}
+    sim, proc, _ = run(cfg, scene(pole))
+    res = proc.process(DepthFrame(sim.capture(1)[0], 1.0, 99, sim.intrinsics, "sim"), 4.0, report_off_path=False)
+    assert res.reported == []
+    assert any(not t.in_path for t in res.tracks)
+
+
+# ------------------------------------------------------------------------ audio
+def test_hrtf_lateralisation():
+    h = StructuralHRTF(48000)
+    for az in (15, 45, 60):
+        itd_r, ild_r = itd_ild(h.hrir(az), 48000)
+        itd_l, ild_l = itd_ild(h.hrir(-az), 48000)
+        assert itd_r > 0 and ild_r > 0 and itd_l < 0 and ild_l < 0
+    assert abs(itd_ild(h.hrir(0), 48000)[0]) < 1e-5
+    assert 550e-6 < itd_ild(h.hrir(90), 48000)[0] < 800e-6
+
+
+def test_limiter_enforces_ceiling():
+    e = AudioEngine(48000, 1024, max_output_dbfs=-6.0)
+    e.schedule(np.ones((4096, 2), np.float32) * 3.0)
+    peaks = [float(np.abs(e.render(1024)).max()) for _ in range(4)]
+    assert max(peaks) <= 10 ** (-6 / 20) + 1e-6
+
+
+def test_sonifier_rate_and_immediate_first_ping():
+    son = Sonifier(48000, StructuralHRTF(48000), range_limit=4.0)
+    assert son.interval(0.8, 0) < son.interval(2.0, 0) < son.interval(3.8, 0)
+    assert son.gain(0.8, 0) > son.gain(3.0, 0)
+    e = AudioEngine(48000, 1024)
+    e.generators.append(son)
+    onsets = []
+    son.on_ping = lambda cue, t, first: onsets.append(first)
+    son.set_cues([{"id": 1, "kind": "body", "r": 1.0, "az": 20.0, "el": 0.0, "rank": 0}])
+    out = e.render(1024)
+    assert onsets and onsets[0] is True
+    assert np.abs(out[:, 1]).sum() > np.abs(out[:, 0]).sum()  # source on the right -> right ear louder
+
+
+# ----------------------------------------------------------------------- device
+def test_settings_persist(tmp_path):
+    p = tmp_path / "s.json"
+    s = SettingsStore(p)
+    s.update(volume=9, range="far", mode="warning")
+    s2 = SettingsStore(p)
+    assert (s2.s.volume, s2.s.range, s2.s.mode) == (9, "far", "warning")
+
+
+def test_health_blocked_and_no_data(cfg):
+    h = HealthMonitor(cfg["health"])
+    h.on_frame(0.0, 0.6)
+    assert h.tick(0.0) == "ok"
+    for t in np.arange(0.1, 1.5, 0.1):
+        h.on_frame(t, 0.01)
+        h.tick(t)
+    assert h.state == "blocked"
+    assert h.tick(4.0) == "no_data"
+
+
+def test_training_angular_error():
+    tr = Trainer()
+    tr.start()
+    tr.set_target(az=30, r=1.5)
+    assert tr.respond(18)["error_deg"] == 12
+    assert tr.summary()["mae_deg"] == 12
+
+
+def test_recording_roundtrip(tmp_path, cfg):
+    sim = SimulatedKinect(cfg, "obstacle_course", seed=1)
+    path = str(tmp_path / "rec.esd")
+    rec = Recorder(path, sim.intrinsics, "sim")
+    frames = []
+    for i in range(3):
+        d, _ = sim.capture(i / 30)
+        frames.append(d)
+        rec.write(DepthFrame(d, i / 30, i + 1, sim.intrinsics, "sim"))
+    rec.close()
+    back = [d for _, _, d in read_recording(path)]
+    assert len(back) == 3 and np.abs(back[1] - frames[1]).max() < 0.0011
+    src = ReplaySource(path)
+    src.start()
+    f = src.read(2.0)
+    src.stop()
+    assert f is not None and f.depth.shape == (424, 512)
+
+
+@pytest.mark.skipif(not find_bridge(), reason="echosense-kinect2 bridge not built")
+def test_kinect2_bridge_fake_stream(cfg):
+    from echosense.sensors import open_source
+
+    src = open_source("kinect2-fake", cfg)
+    try:
+        f = src.read(3.0)
+        assert f is not None and f.depth.shape == (424, 512) and (f.depth > 0).mean() > 0.2
+    finally:
+        src.stop()
+
+
+def test_app_end_to_end(tmp_path, cfg):
+    from echosense.app import EchoSense
+
+    cfg["speech"]["engine"] = "none"
+    cfg["paths"]["logs"] = str(tmp_path / "logs")
+    app = EchoSense(cfg, source="sim", scene="obstacle_course", audio="none", settings_path=str(tmp_path / "s.json"))
+    app.start()
+    try:
+        app.sim.set_pose(0.0, 1.0, 0.0)  # box obstacle ~1.7 m ahead
+        time.sleep(2.5)
+        m = app.metrics()
+        assert m["fps"] > 5  # the simulated sensor is slower on constrained arm64 (virtual Orange Pi)
+        assert app.health.state == "ok"
+        assert app.cues and app.cues[0]["kind"] == "body"
+        assert app.sonifier.pings > 0
+        app.action("volume_up")
+        assert app.settings.s.volume == 7
+        app.sim_command("blocked", True)
+        time.sleep(2.5)
+        assert app.health.state == "blocked" and app.cues == []
+    finally:
+        app.stop()

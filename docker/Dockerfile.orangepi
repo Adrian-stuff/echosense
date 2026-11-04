@@ -1,0 +1,35 @@
+# Virtual Orange Pi 5 for Echo-Sense.
+#
+# Same CPU architecture (arm64), same OS as the board's official image (Ubuntu 22.04
+# "Jammy"), same install script, same profile and entrypoint as the real device.
+# On an Apple Silicon Mac this runs natively; on an x86 PC Docker emulates arm64 with QEMU.
+FROM --platform=linux/arm64 ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Manila LANG=C.UTF-8
+
+RUN useradd -m -s /bin/bash orangepi && groupadd -f plugdev && groupadd -f gpio
+
+# 1) system packages + libfreenect2 (slow, cached)
+COPY deploy/install_orangepi.sh /opt/echosense/src/deploy/install_orangepi.sh
+RUN /opt/echosense/src/deploy/install_orangepi.sh --deps --no-systemd && rm -rf /var/lib/apt/lists/*
+
+# 2) Echo-Sense itself
+COPY pyproject.toml README.md /opt/echosense/src/
+COPY echosense /opt/echosense/src/echosense
+COPY native /opt/echosense/src/native
+COPY deploy /opt/echosense/src/deploy
+COPY tests /opt/echosense/src/tests
+RUN rm -rf /opt/echosense/src/native/build \
+ && /opt/echosense/src/deploy/install_orangepi.sh --app --no-systemd \
+ && ln -s /opt/echosense/venv/bin/echosense /usr/local/bin/echosense \
+ && chown -R orangepi:orangepi /opt/echosense/src
+
+USER orangepi
+WORKDIR /home/orangepi
+ENV ECHOSENSE_PROFILE=orangepi5
+EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=3s --start-period=20s CMD curl -fs http://localhost:8080/api/state >/dev/null || exit 1
+# Same command the systemd service runs on the board. No sound card in a container, so the
+# audio runs on a clock and can be heard through the console's "Listen" button.
+CMD ["echosense", "run", "--source", "auto", "--audio", "none", "--no-browser"]

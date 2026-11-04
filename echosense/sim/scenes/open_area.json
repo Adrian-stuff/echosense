@@ -1,0 +1,10 @@
+{
+  "name": "Open area (false-positive check)",
+  "description": "Flat open ground with nothing within sensor range. Any cue here is a false positive.",
+  "ground": "concrete",
+  "start": {"x": 0.0, "z": 0.0, "yaw": 0.0},
+  "route": [[0.0, 0.0], [0.0, 20.0]],
+  "objects": [
+    {"type": "box", "name": "Far wall", "x": 0.0, "z": 40.0, "w": 30.0, "h": 3.0, "d": 0.3, "material": "concrete"}
+  ]
+}

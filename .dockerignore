@@ -1,0 +1,9 @@
+.venv
+.git
+.claude
+native/build
+logs
+reports
+**/__pycache__
+*.esd
+*.egg-info
