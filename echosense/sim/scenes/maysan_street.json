@@ -2,24 +2,239 @@
   "name": "Barangay sidewalk",
   "description": "Narrow urban sidewalk modelled on the hazards in the proposal's locale: utility pole, low-hanging sign, parked tricycle and motorcycle, open drainage, low bench, tree canopy at head height, glass display case, oncoming pedestrian and a curb drop to the street.",
   "ground": "asphalt",
-  "start": {"x": 0.0, "z": 0.0, "yaw": 0.0},
-  "route": [[0.0, 0.0], [-0.35, 2.0], [-0.35, 4.2], [0.6, 5.0], [0.6, 6.1], [-0.45, 6.55], [-0.45, 9.5],
-            [0.55, 10.4], [0.55, 12.2], [0.15, 13.4], [0.1, 13.95], [-0.5, 14.5], [-0.6, 16.5], [-0.6, 19.4], [0.4, 20.4],
-            [0.4, 22.5], [-0.62, 24.0], [-0.62, 30.0]],
+  "start": {
+    "x": 0.0,
+    "z": 0.0,
+    "yaw": 0.0
+  },
+  "route": [
+    [
+      0.0,
+      0.0
+    ],
+    [
+      -0.35,
+      2.0
+    ],
+    [
+      -0.35,
+      4.2
+    ],
+    [
+      0.6,
+      5.0
+    ],
+    [
+      0.6,
+      6.1
+    ],
+    [
+      -0.45,
+      6.55
+    ],
+    [
+      -0.45,
+      9.5
+    ],
+    [
+      0.55,
+      10.4
+    ],
+    [
+      0.55,
+      12.2
+    ],
+    [
+      0.15,
+      13.4
+    ],
+    [
+      0.1,
+      13.95
+    ],
+    [
+      -0.5,
+      14.5
+    ],
+    [
+      -0.6,
+      16.5
+    ],
+    [
+      -0.6,
+      19.4
+    ],
+    [
+      0.4,
+      20.4
+    ],
+    [
+      0.4,
+      22.5
+    ],
+    [
+      -0.62,
+      24.0
+    ],
+    [
+      -0.62,
+      30.0
+    ]
+  ],
   "objects": [
-    {"type": "box", "name": "House wall", "x": -1.1, "z": 16.0, "w": 0.2, "h": 2.8, "d": 34.0, "material": "concrete"},
-    {"type": "pit", "name": "Curb drop to street", "x0": 0.95, "x1": 5.0, "z0": -3.0, "z1": 35.0, "depth": 0.15},
-    {"type": "cylinder", "name": "Utility pole", "x": 0.35, "z": 3.0, "r": 0.14, "y1": 7.0, "material": "concrete"},
-    {"type": "box", "name": "Low-hanging store sign", "x": -0.3, "z": 5.6, "w": 1.2, "h": 0.35, "d": 0.08, "y0": 1.55, "material": "metal"},
-    {"type": "box", "name": "Parked tricycle", "x": 0.55, "z": 8.0, "w": 1.0, "h": 1.5, "d": 2.0, "yaw": 8, "material": "metal"},
-    {"type": "pit", "name": "Open drainage", "x0": -0.95, "x1": 0.2, "z0": 11.0, "z1": 11.6, "depth": 0.6},
-    {"type": "box", "name": "Low bench", "x": -0.6, "z": 13.5, "w": 0.6, "h": 0.4, "d": 0.4, "material": "wood"},
-    {"type": "cylinder", "name": "Tree trunk", "x": 0.6, "z": 15.0, "r": 0.18, "y1": 2.2, "material": "wood"},
-    {"type": "sphere", "name": "Tree canopy", "x": 0.6, "y": 2.4, "z": 15.0, "r": 1.0, "material": "foliage"},
-    {"type": "box", "name": "Parked motorcycle", "x": 0.75, "z": 18.0, "w": 1.9, "h": 1.1, "d": 0.7, "material": "metal"},
-    {"type": "box", "name": "Glass display case", "x": -0.6, "z": 21.5, "w": 0.6, "h": 1.2, "d": 0.5, "material": "glass"},
-    {"type": "box", "name": "Hanging cable bundle", "x": 0.3, "z": 26.0, "w": 1.2, "h": 0.06, "d": 0.06, "y0": 1.72, "material": "wood"},
-    {"type": "box", "name": "Gate", "x": 0.0, "z": 32.0, "w": 2.2, "h": 2.2, "d": 0.1, "material": "metal"},
-    {"type": "pedestrian", "name": "Pedestrian", "path": [[0.1, 29.0], [0.1, 22.0]], "speed": 0.8}
+    {
+      "type": "box",
+      "name": "House wall",
+      "x": -1.1,
+      "z": 16.0,
+      "w": 0.2,
+      "h": 2.8,
+      "d": 34.0,
+      "material": "concrete",
+      "class": "wall"
+    },
+    {
+      "type": "pit",
+      "name": "Curb drop to street",
+      "x0": 0.95,
+      "x1": 5.0,
+      "z0": -3.0,
+      "z1": 35.0,
+      "depth": 0.15
+    },
+    {
+      "type": "cylinder",
+      "name": "Utility pole",
+      "x": 0.35,
+      "z": 3.0,
+      "r": 0.14,
+      "y1": 7.0,
+      "material": "concrete",
+      "class": "pole"
+    },
+    {
+      "type": "box",
+      "name": "Low-hanging store sign",
+      "x": -0.3,
+      "z": 5.6,
+      "w": 1.2,
+      "h": 0.35,
+      "d": 0.08,
+      "y0": 1.55,
+      "material": "metal",
+      "class": "overhang"
+    },
+    {
+      "type": "box",
+      "name": "Parked tricycle",
+      "x": 0.55,
+      "z": 8.0,
+      "w": 1.0,
+      "h": 1.5,
+      "d": 2.0,
+      "yaw": 8,
+      "material": "metal",
+      "class": "vehicle"
+    },
+    {
+      "type": "pit",
+      "name": "Open drainage",
+      "x0": -0.95,
+      "x1": 0.2,
+      "z0": 11.0,
+      "z1": 11.6,
+      "depth": 0.6
+    },
+    {
+      "type": "box",
+      "name": "Low bench",
+      "x": -0.6,
+      "z": 13.5,
+      "w": 0.6,
+      "h": 0.4,
+      "d": 0.4,
+      "material": "wood",
+      "class": "low"
+    },
+    {
+      "type": "cylinder",
+      "name": "Tree trunk",
+      "x": 0.6,
+      "z": 15.0,
+      "r": 0.18,
+      "y1": 2.2,
+      "material": "wood",
+      "class": "pole"
+    },
+    {
+      "type": "sphere",
+      "name": "Tree canopy",
+      "x": 0.6,
+      "y": 2.4,
+      "z": 15.0,
+      "r": 1.0,
+      "material": "foliage",
+      "class": "overhang"
+    },
+    {
+      "type": "box",
+      "name": "Parked motorcycle",
+      "x": 0.75,
+      "z": 18.0,
+      "w": 1.9,
+      "h": 1.1,
+      "d": 0.7,
+      "material": "metal",
+      "class": "vehicle"
+    },
+    {
+      "type": "box",
+      "name": "Glass display case",
+      "x": -0.6,
+      "z": 21.5,
+      "w": 0.6,
+      "h": 1.2,
+      "d": 0.5,
+      "material": "glass",
+      "class": "object"
+    },
+    {
+      "type": "box",
+      "name": "Hanging cable bundle",
+      "x": 0.3,
+      "z": 26.0,
+      "w": 1.2,
+      "h": 0.06,
+      "d": 0.06,
+      "y0": 1.72,
+      "material": "wood",
+      "class": "overhang"
+    },
+    {
+      "type": "box",
+      "name": "Gate",
+      "x": 0.0,
+      "z": 32.0,
+      "w": 2.2,
+      "h": 2.2,
+      "d": 0.1,
+      "material": "metal",
+      "class": "wall"
+    },
+    {
+      "type": "pedestrian",
+      "name": "Pedestrian",
+      "path": [
+        [
+          0.1,
+          29.0
+        ],
+        [
+          0.1,
+          22.0
+        ]
+      ],
+      "speed": 0.8
+    }
   ]
 }

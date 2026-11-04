@@ -31,7 +31,8 @@ class SimulatedKinect(DepthSource):
         self.label = f"Simulated {self.sensor['label'].split(' (')[0]}"
         self.cam = CameraModel.from_config(self.sensor)
         self.intrinsics = {k: self.sensor[k] for k in ("width", "height", "fx", "fy", "cx", "cy")}
-        self.fps = float(self.sensor.get("fps", 30))
+        # a lite profile may ask for fewer frames than the sensor can give (e.g. 15 on an Orange Pi One)
+        self.fps = float(min(self.sensor.get("fps", 30), s.get("fps", 30)))
         self.rng = np.random.default_rng(seed)
         self.mount_height = float(s["mount_height"])
         self.mount_pitch = float(s["mount_pitch_deg"])

@@ -23,5 +23,25 @@ services:
       - opi-home:/home/orangepi   # settings + session logs survive restarts, like the board's SD card
     restart: unless-stopped
 
+  # Orange Pi One (32-bit armhf, Kinect v1, lite profile). Not started by default:
+  #   docker compose --profile one up --build orangepi-one      -> http://localhost:8082
+  orangepi-one:
+    profiles: ["one"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.orangepi-one
+    image: echosense/orangepi-one:dev
+    platform: linux/arm/v7
+    hostname: orangepi-one
+    ports:
+      - "8082:8080"
+    cpus: "4"
+    mem_limit: "512m"
+    environment:
+      - ECHOSENSE_PROFILE=orangepi_one
+    volumes:
+      - opi-one-home:/home/orangepi
+
 volumes:
   opi-home: {}
+  opi-one-home: {}

@@ -51,6 +51,8 @@ DEFAULTS: dict = {
         "hold_frames": 2,  # keep a flickering pixel's last depth this many frames
         "flying_pixel_filter": True,
         "column_estimator": True,
+        "recognition": True,  # depth-only object recognition (processing/objects.py)
+        "object_model": "",  # empty = the shipped model
         "ground_tolerance": 0.08,  # |height| below this is ground (m)
         "drop_threshold": 0.12,  # below the ground plane by this = drop-off
         "user_height": 1.75,
@@ -119,6 +121,14 @@ DEFAULTS: dict = {
         "training_on": "Training mode.",
         "training_off": "Training mode off.",
         "profile": "Sound profile {profile}.",
+        "describe_item": "{label}, {meters} meters, {direction}",
+        "describe_none": "Nothing ahead within {range} meters.",
+        "announce": "{label} {direction}.",
+        "dir_ahead": "ahead",
+        "dir_slight_left": "slightly left",
+        "dir_slight_right": "slightly right",
+        "dir_left": "left",
+        "dir_right": "right",
     },
 }
 

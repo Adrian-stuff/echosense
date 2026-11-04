@@ -243,17 +243,18 @@ class Pit:
 
 
 class Pedestrian:
-    """A person walking back and forth along a straight path."""
+    """A person walking back and forth along a straight path (speed 0 = standing)."""
 
-    def __init__(self, name, path, speed=0.9, phase=0.0):
+    def __init__(self, name, path, speed=0.9, phase=0.0, height=1.72, radius=0.22):
         self.name = name
         self.p0 = np.array(path[0], float)
         self.p1 = np.array(path[1], float)
         self.speed = float(speed)
         self.phase = float(phase)
         self.length = float(np.linalg.norm(self.p1 - self.p0)) or 1.0
-        self.body = Cylinder(name, *self.p0, r=0.22, y1=1.45, material="fabric")
-        self.head = Sphere(name, self.p0[0], 1.60, self.p0[1], r=0.12, material="skin")
+        self.height, self.radius = float(height), float(radius)
+        self.body = Cylinder(name, *self.p0, r=self.radius, y1=self.height - 0.27, material="fabric")
+        self.head = Sphere(name, self.p0[0], self.height - 0.12, self.p0[1], r=0.12, material="skin")
         self.x, self.z = float(self.p0[0]), float(self.p0[1])
 
     def update(self, t: float):
@@ -269,7 +270,8 @@ class Pedestrian:
         return (self.body, self.head)
 
     def to_dict(self):
-        return dict(type="pedestrian", name=self.name, path=[self.p0.tolist(), self.p1.tolist()], speed=self.speed)
+        return dict(type="pedestrian", name=self.name, path=[self.p0.tolist(), self.p1.tolist()], speed=self.speed,
+                    height=self.height, radius=self.radius)
 
 
 def list_scenes() -> list[dict]:
@@ -304,18 +306,27 @@ class World:
             o = dict(o)
             t = o.pop("type")
             name = o.pop("name", t)
+            cls = o.pop("class", None)  # ground-truth object class (recognition training / evaluation)
+            group = o.pop("group", None)  # several primitives forming one object (car body + cabin)
             if t == "box":
-                self.static.append(Box(name, **o))
+                obj = Box(name, **o)
+                self.static.append(obj)
             elif t == "cylinder":
-                self.static.append(Cylinder(name, **o))
+                obj = Cylinder(name, **o)
+                self.static.append(obj)
             elif t == "sphere":
-                self.static.append(Sphere(name, **o))
+                obj = Sphere(name, **o)
+                self.static.append(obj)
             elif t == "pit":
-                self.pits.append(Pit(name, **o))
+                obj = Pit(name, **o)
+                self.pits.append(obj)
             elif t == "pedestrian":
-                self.movers.append(Pedestrian(name, **o))
+                obj = Pedestrian(name, **o)
+                self.movers.append(obj)
+                cls = cls or "person"
             else:
                 raise ValueError(f"unknown object type {t!r}")
+            obj.cls, obj.group = cls, group if group is not None else name
         self.ground_material = MAT_INDEX.get(self.scene.get("ground", "asphalt"), 0)
 
     # ------------------------------------------------------------------ state
@@ -338,8 +349,25 @@ class World:
 
     def to_dict(self) -> dict:
         d = {k: v for k, v in self.scene.items() if k != "objects"}
-        d["objects"] = [p.to_dict() for p in self.static] + [p.to_dict() for p in self.pits] + [m.to_dict() for m in self.movers]
+        d["objects"] = []
+        for o in list(self.static) + list(self.pits) + list(self.movers):
+            od = o.to_dict()
+            if getattr(o, "cls", None):
+                od["class"] = o.cls
+            d["objects"].append(od)
         return d
+
+    def labelled_footprints(self):
+        """(class, group, xmin, xmax, zmin, zmax, ymin, ymax) for every object with a ground-truth class."""
+        out = []
+        for o in self.static:
+            if getattr(o, "cls", None):
+                lo, hi = o.aabb()
+                out.append((o.cls, o.group, lo[0], hi[0], lo[2], hi[2], lo[1], hi[1]))
+        for m in self.movers:
+            r = m.radius
+            out.append((m.cls, m.group, m.x - r, m.x + r, m.z - r, m.z + r, 0.0, m.height))
+        return out
 
     def mover_states(self) -> list[dict]:
         return [{"name": m.name, "x": round(m.x, 3), "z": round(m.z, 3)} for m in self.movers]
@@ -369,8 +397,9 @@ class World:
                 continue
             v0, v1, u0, u1 = win
             sub, zv, mv = dirs[v0:v1, u0:u1], zbuf[v0:v1, u0:u1], mat[v0:v1, u0:u1]
-            px = o[0] + zv * sub[..., 0]
-            pz = o[2] + zv * sub[..., 2]
+            with np.errstate(invalid="ignore"):
+                px = o[0] + zv * sub[..., 0]
+                pz = o[2] + zv * sub[..., 2]
             inside = np.isfinite(zv) & (px > pit.x0) & (px < pit.x1) & (pz > pit.z0) & (pz < pit.z1)
             if inside.any():
                 zv[inside] = pit.exit_t(o, sub[inside])

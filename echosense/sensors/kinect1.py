@@ -24,6 +24,7 @@ class Kinect1Source(DepthSource):
         except ImportError as e:
             raise SourceError("Python 'freenect' module not installed (libfreenect wrappers/python).") from e
         self.fn = freenect
+        self.period = 1.0 / float(cfg["sensor"].get("fps", 30))  # publish at most this often
         # approximate factory intrinsics of the Kinect v1 depth camera (640x480)
         self.intrinsics = {"width": 640, "height": 480, "fx": 585.0, "fy": 585.0, "cx": 319.5, "cy": 239.5}
         self._thread = None
@@ -37,8 +38,12 @@ class Kinect1Source(DepthSource):
         self._thread.start()
 
     def _run(self):
+        last = 0.0
         while self.running:
             res = self.fn.sync_get_depth(format=self.fn.DEPTH_MM)
+            if res is not None and time.monotonic() - last < self.period * 0.9:
+                continue  # the Kinect v1 always streams 30 fps; skip frames a lite board won't process
+            last = time.monotonic()
             if res is None:
                 self.error = "Kinect v1 disconnected"
                 self.running = False
@@ -48,7 +53,7 @@ class Kinect1Source(DepthSource):
 
     def spec(self, cfg: dict) -> dict:
         d = super().spec(cfg)
-        d.update(model="kinect_v1", min_depth=0.5, max_depth=4.0)
+        d.update(model="kinect_v1", min_depth=0.8, max_depth=4.0)
         return d
 
     def stop(self):

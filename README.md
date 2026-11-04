@@ -179,6 +179,91 @@ treated as pinhole.
 * **Viewer FOV** slider (under the 3D view) widens the 3D camera. *Sensor view* always uses the
   sensor's real FOV.
 
+## Object recognition (depth only, lightweight)
+
+Each obstacle gets a type: **person, pole, vehicle, wall, object** (stalls, boxes, bins, cases),
+**low obstacle, overhang, hole, step down, curb**. It works from the depth shape alone: no camera,
+no GPU, no extra hardware. It runs in the dark and raises no privacy issue.
+
+* **Overhangs and low obstacles are named by geometry.** Something with free space below that
+  the sensor actually saw is an overhang; something entirely below knee height is a low obstacle.
+  Holes vs step-downs go by depth, and curbs by their parallel edge.
+* **Everything else goes to a small decision tree** (`echosense/processing/models/objects.json`,
+  17 KB, about 2 µs per obstacle) over 15 shape numbers: width at three heights, height span,
+  solidity, surface density and roughness, and whether the field of view cuts it off. Labels
+  settle over about 4 frames.
+* **Sounds don't change.** Cues still encode height band and distance, as the proposal specifies.
+  The type is **spoken on demand**:
+  * the **What's ahead?** button (Space) says e.g. "Person, 2 meters, slightly right. Pole, 3
+    meters, ahead." (up to three obstacles, those in the path first)
+  * optionally, **"Announce people and vehicles automatically"** (Fitting card) says "Person
+    ahead" when one appears
+* **Retrain** with `echosense train-objects`. It generates about 2,800 random scenes (people
+  standing and walking, poles, trunks, cars, tricycles, motorcycles, walls, gates, stalls, bins,
+  curbs, benches, signs, cables, awnings, canopies) with random sizes, materials, sunlight and
+  mount, seen by Kinect v2 and v1 models. It trains in about 3 minutes and writes a report.
+  `--extra real.csv` adds labelled rows from field recordings.
+
+Accuracy in simulation:
+
+| Test | Correct |
+|---|---|
+| Held-out random scenes | 87% (people 88%, poles 93%, low 98%, overhangs 92%, vehicles 80%) |
+| Obstacle course walk-through (never seen in training) | 93–96% |
+| Street walk-through (never seen in training) | 56–58% |
+
+Its weak point is parked vehicles vs stalls: a tricycle seen head-on is a 1 m × 1.5 m block,
+exactly like a stall. A camera would settle that; see "Next steps" below. The tree is trained on
+simulator shapes, so it **must be checked against labelled Kinect recordings** before anyone relies
+on the spoken types. Obstacle warnings never wait for recognition.
+
+## Orange Pi One
+
+**The Kinect v2 cannot run on an Orange Pi One.** The One has only USB 2.0, and the Kinect v2
+needs USB 3.0. Even with the right port, the One's 32-bit Cortex-A7 cores couldn't decode Kinect v2
+depth in real time.
+
+**An Orange Pi One with a Kinect v1 (Xbox 360) is supported** through the `orangepi_one` profile.
+The Kinect v1 runs on USB 2.0 and computes depth inside the sensor, so the board does very little
+decoding. The profile runs at 15 fps (the proposal's minimum) with coarse sampling and 24 kHz
+audio. Install it on the board with:
+
+```bash
+sudo deploy/install_orangepi_one.sh                         # Armbian / Debian 12 armhf, all from apt
+echosense --profile orangepi_one perf --source kinect1 --minutes 5
+```
+
+On the development Mac the lite pipeline takes about 5 ms per frame (p95 14 ms in the live app,
+16 fps). A Cortex-A7 at 1.2 GHz is roughly 10–15× slower per core, so expect 50–80 ms per frame on
+the One: probably workable at 15 fps but with little headroom. Only `echosense perf` on the board
+will tell. If it's too slow, lower `sensor.fps` to 10, raise `processing.stride` to 10, or set
+`web.enabled` to `false`.
+
+Compatibility is checked: all tests pass with Debian 12's armhf library versions (Python 3.11,
+numpy 1.24, aiohttp 3.8, psutil 5.9). A 32-bit ARM container exists
+(`docker compose --profile one up --build orangepi-one`, port 8082) but hasn't been run yet. It
+uses QEMU emulation on Apple Silicon, so it checks installation, not speed.
+
+What changes with Kinect v1 + Orange Pi One, compared with the proposal's Kinect v2 + Orange Pi 5:
+
+| | Kinect v2 | Kinect v1 |
+|---|---|---|
+| Field of view | 70 × 60° | 57 × 45° |
+| Range | 0.5–4.5 m | 0.8–4.0 m |
+| Floor visible from (1.25 m, −10° tilt) | 1.48 m | ~2 m (a 15 cm step-down at 2 m is missed) |
+| Head height (1.7 m) visible from | 1.23 m | ~2 m (a 3 cm cable at 2 m is missed) |
+| Direct sunlight | degrades (ToF, sunlight suppression) | **structured light: largely fails outdoors in direct sun** |
+
+The sunlight row matters most for a device meant for barangay streets. Plan the field trials for
+shade or overcast conditions, or keep a USB 3.0 board. The board itself also has practical limits:
+* 512 MB RAM. Echo-Sense uses about 60 MB.
+* No Wi-Fi. Use Ethernet for the caregiver console.
+* Usually no headphone jack. Plan on a USB audio adapter.
+* One USB host port. A USB hub is needed for both the Kinect and the audio adapter.
+
+If cost is the reason for the One, a cheaper board that still has USB 3.0 (e.g. Orange Pi 3B)
+keeps the Kinect v2. Its slower cores need checking with `echosense perf`.
+
 ## Can the Orange Pi handle it? (performance monitor)
 
 The device software samples itself every second. The console's **Performance** card and the
@@ -234,6 +319,7 @@ echosense bench                 # per-stage timing + estimated obstacle-to-sound
 echosense protocol --quick      # lab protocol in simulation (concrete, indoor, 5 reps), a few seconds
 echosense protocol              # full: 8 distances x 9 azimuths x 5 materials x 3 lighting x 30 reps
 echosense eval-sensing          # hard-case depth benchmark (--preset azure_wfov etc. to compare sensors)
+echosense train-objects         # retrain the depth-only object recogniser (writes reports/objects-*.md)
 echosense info                  # what this machine has: sources, audio device, TTS
 .venv/bin/pytest -q             # test-suite
 ```
@@ -270,6 +356,11 @@ motorcycle, glass case, hanging cable, oncoming pedestrian, curb. Copy one to bu
 | Physical buttons | `device/gpio.py` (libgpiod; set pins in the profile's `gpio.buttons`) |
 
 ## Not done yet / needs hardware
+
+* **Camera-based recognition (next step).** Kinect v2 colour + a YOLO-nano detector on the Orange
+  Pi 5's NPU (RK3588), fused with depth, would tell tricycles from stalls and recognise signs. It
+  needs the board, colour streaming in the bridge, locally collected training photos, and
+  privacy handling (process on device, never store frames). It isn't possible on an Orange Pi One.
 
 * Kinect v2 path compiled and protocol-tested with `--fake`, but **not yet run against a real Kinect**.
   Do the mirror check above first.

@@ -403,3 +403,50 @@ def test_sensor_presets_and_coverage(cfg):
     assert sim.cam.width == 512 and sim.cam.height == 512
     assert proc.stride_used == 2  # coarser pixels -> finer stride
     assert any(abs(o["r"] - 2.0) < 0.1 for o in res.reported)
+
+
+# ------------------------------------------------------- object recognition / lite
+def test_object_model_is_small_and_fast():
+    from echosense.processing.objects import MODEL_PATH, ObjectRecognizer
+
+    rec = ObjectRecognizer()
+    assert rec.available and MODEL_PATH.stat().st_size < 64 * 1024
+    x = np.zeros(15, np.float32)
+    t = time.perf_counter()
+    for _ in range(1000):
+        rec.proba(x)
+    assert (time.perf_counter() - t) / 1000 < 1e-3
+
+
+@pytest.mark.parametrize("cls,obj,expect", [
+    ("person", {"type": "pedestrian", "name": "p", "path": [[0.0, 2.6], [0.0, 2.601]], "speed": 0.0}, "person"),
+    ("pole", {"type": "cylinder", "name": "pole", "x": 0.0, "z": 2.6, "r": 0.12, "y1": 5.0}, "pole"),
+    ("overhang", {"type": "box", "name": "s", "x": 0, "z": 2.6, "w": 0.8, "h": 0.3, "d": 0.05, "y0": 1.55}, "overhang"),
+    ("low", {"type": "box", "name": "b", "x": 0, "z": 2.6, "w": 0.8, "h": 0.3, "d": 0.4}, "low"),
+])
+def test_recognises_common_obstacles(cfg, cls, obj, expect):
+    _, _, res = run(cfg, scene(obj), frames=10)
+    assert res.reported and res.reported[0]["label"] == expect
+
+
+def test_whats_ahead_phrase(tmp_path, cfg):
+    from echosense.app import EchoSense
+
+    cfg["speech"]["engine"] = "none"
+    app = EchoSense(cfg, source="sim", scene=scene({"type": "cylinder", "name": "pole", "x": 0.0, "z": 1.62, "r": 0.12, "y1": 5.0}),
+                    audio="none", settings_path=str(tmp_path / "s.json"))
+    app.start()
+    try:
+        time.sleep(1.5)
+        assert app.describe_scene() == "Pole, 1.5 meters, ahead."
+    finally:
+        app.stop()
+
+
+def test_orange_pi_one_profile_runs_lite(tmp_path):
+    cfg = load_config(profile="orangepi_one")
+    assert cfg["sensor"]["fps"] == 15 and cfg["sim"]["sensor_preset"] == "kinect_v1"
+    sim, proc, res = run(cfg, lab_scene(2.0, 0, "concrete"), frames=5)
+    assert sim.cam.width == 640 and sim.fps == 15
+    assert proc.stride_used == 8 and proc.front.prestride == 2
+    assert any(abs(o["r"] - 2.0) < 0.1 for o in res.reported)

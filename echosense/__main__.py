@@ -142,6 +142,14 @@ def main(argv=None):
     e.add_argument("--preset", help="simulated sensor model (kinect_v2, azure_nfov, azure_wfov, realsense_d455)")
     e.set_defaults(fn=lambda a: __import__("echosense.tools.sensing_eval", fromlist=["run"]).run(a))
 
+    o = sub.add_parser("train-objects", help="train the depth-only object recogniser on simulator scenes")
+    o.add_argument("--scenes", type=int, default=2800)
+    o.add_argument("--depth", type=int, default=9, help="decision tree depth")
+    o.add_argument("--extra", help="CSV of real labelled feature rows to add")
+    o.add_argument("--model", help="output model path (default: the shipped model)")
+    o.add_argument("--out", default="reports")
+    o.set_defaults(fn=lambda a: __import__("echosense.tools.train_objects", fromlist=["run"]).run(a))
+
     i = sub.add_parser("info", help="show sensors / audio / TTS available here")
     i.set_defaults(fn=cmd_info)
 

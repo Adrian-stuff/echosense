@@ -132,3 +132,8 @@ kbd { font: 10px ui-monospace, monospace; color: var(--muted); border: 1px solid
 .coverage dt { color: var(--muted); }
 .coverage dd { margin: 0; font-variant-numeric: tabular-nums; }
 .coverage .gap { color: var(--warn); }
+.btngrid .wide { grid-column: 1 / -1; }
+.labels3d { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.labels3d span { position: absolute; transform: translate(-50%, -100%); font-size: 11px; padding: 1px 6px; border-radius: 4px;
+  background: rgba(10,13,18,.8); border: 1px solid var(--line); white-space: nowrap; color: var(--text); }
+.labels3d span.cued { border-color: #fff; font-weight: 650; }

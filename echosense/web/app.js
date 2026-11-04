@@ -13,6 +13,8 @@ const KIND = {
   wall: { color: 0x5b6878, label: 'Parallel wall', sound: 'suppressed' },
   edge: { color: 0x5b6878, label: 'Parallel curb', sound: 'suppressed' },
 };
+const LABEL = { person: 'Person', pole: 'Pole', vehicle: 'Vehicle', wall: 'Wall', object: 'Object', low: 'Low obstacle',
+  overhang: 'Overhang', hole: 'Hole', step: 'Step down', curb: 'Curb', unknown: 'Obstacle' };
 const MAT_COLOR = { concrete: 0x8a96a6, metal: 0x7fa7c9, glass: 0x9fe9ff, fabric: 0xc78bd6, foliage: 0x5fbf6a,
   wood: 0xc8a27a, skin: 0xe0b49a, asphalt: 0x555f6b };
 
@@ -440,10 +442,11 @@ function updatePanels(s) {
     html = `<div class="cue"><div class="big">Training ${t ? `· ${t.kind} · ${t.r} m · ${sideTxt(t.az)}` : '· blind trial'}</div><div class="sub">${t ? 'stationary practice target' : 'click the dial where the sound seems to be'}</div></div>`;
   } else if (s.cues.length) {
     const c = s.cues[0], k = KIND[c.kind] || KIND.body;
-    html = `<div class="cue" style="border-left-color:#${k.color.toString(16).padStart(6, '0')}"><div class="big">${k.label} · ${c.r.toFixed(2)} m · ${sideTxt(c.az)}</div>` +
+    const nm = c.label && c.label !== 'unknown' ? LABEL[c.label] || c.label : k.label;
+    html = `<div class="cue" style="border-left-color:#${k.color.toString(16).padStart(6, '0')}"><div class="big">${nm} · ${c.r.toFixed(2)} m · ${sideTxt(c.az)}</div>` +
       `<div class="sub">${k.sound}, every ${cueInterval(c.r_urgent ?? c.r, 0, s.range_m).toFixed(2)} s · elevation ${c.el >= 0 ? '+' : ''}${c.el.toFixed(0)}°` +
       `${c.ttc != null ? ` · <b>approaching, contact in ${c.ttc.toFixed(1)} s</b>` : ''}</div>` +
-      (s.cues[1] ? `<div class="sub">also: ${KIND[s.cues[1].kind]?.label} ${s.cues[1].r.toFixed(2)} m ${sideTxt(s.cues[1].az)} (quieter)</div>` : '') + '</div>';
+      (s.cues[1] ? `<div class="sub">also: ${LABEL[s.cues[1].label] || KIND[s.cues[1].kind]?.label} ${s.cues[1].r.toFixed(2)} m ${sideTxt(s.cues[1].az)} (quieter)</div>` : '') + '</div>';
   } else html = `<div class="cue quiet"><div class="big">Path clear</div><div class="sub">${set.mode === 'warning' ? `silent until something is within ${set.warning_distance} m` : `nothing in the corridor within ${s.range_m} m`}</div></div>`;
   hud.innerHTML = html;
 
@@ -483,6 +486,7 @@ function updatePanels(s) {
       `<dt></dt><dd class="meta">Closer than these distances the sensor is blind at that height.</dd>`;
   }
   $('mirror-wrap').hidden = s.source !== 'kinect2';
+  $('c-announce').checked = !!set.announce;
   $('ground-est').textContent = s.ground.ok ? `floor says ${s.ground.height.toFixed(2)} m, ${s.ground.pitch.toFixed(1)}°` : 'floor not visible';
   $('b-log').textContent = s.logging ? 'Stop logging' : 'Start logging';
   $('b-log').classList.toggle('on', s.logging);
@@ -622,6 +626,7 @@ $('s-reset').onclick = () => send({ t: 'sim', key: 'reset' });
 $('m-cal').onclick = () => send({ t: 'setting', key: 'calibrate_mount' });
 document.querySelectorAll('#zone button').forEach((b) => (b.onclick = () => send({ t: 'setting', key: 'report_off_path', value: b.dataset.zone === 'fov' })));
 $('preset').onchange = () => { toast('Switching simulated sensor…'); send({ t: 'sim', key: 'sensor_preset', value: $('preset').value }); };
+$('c-announce').onchange = (e) => send({ t: 'setting', key: 'announce', value: e.target.checked });
 $('c-mirror').onchange = (e) => send({ t: 'setting', key: 'flip_horizontal', value: e.target.checked });
 const sliderSetting = (id, key, simKey) => {
   const el = $(id);
@@ -647,7 +652,7 @@ function setView(v) {
 
 // keyboard: walking (simulator) + device buttons
 const keys = new Set();
-const KEY_ACTION = { p: 'power', '=': 'volume_up', '+': 'volume_up', '-': 'volume_down', r: 'range_next', m: 'mode_next', b: 'battery', i: 'status', t: 'training', o: 'profile_next' };
+const KEY_ACTION = { ' ': 'describe', p: 'power', '=': 'volume_up', '+': 'volume_up', '-': 'volume_down', r: 'range_next', m: 'mode_next', b: 'battery', i: 'status', t: 'training', o: 'profile_next' };
 let lastMove = '';
 function sendMove(force = false) {
   const f = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0);
@@ -665,6 +670,7 @@ addEventListener('keydown', (e) => {
     keys.add(k);
     sendMove();
   } else if (KEY_ACTION[k] && !e.repeat) {
+    if (k === ' ') { e.preventDefault(); if (document.activeElement?.tagName === 'BUTTON') document.activeElement.blur(); }
     send({ t: 'action', action: KEY_ACTION[k] });
   } else if (k === 'v' && !e.repeat) {
     const order = ['follow', 'sensor', 'top', 'free'];
@@ -701,6 +707,32 @@ function playAudio(i16) {
   if (audio.next < now + 0.03 || audio.next > now + 0.6) audio.next = now + 0.12;
   src.start(audio.next);
   audio.next += buf.duration;
+}
+
+// ------------------------------------------------------------ 3D labels
+const labelEls = [];
+const lv = new THREE.Vector3();
+function drawLabels3d() {
+  const host = $('labels3d');
+  const tracks = st && $('t-boxes').checked ? st.tracks.filter((t) => t.confirmed && !t.suppressed) : [];
+  const cued = new Set((st?.cues || []).map((c) => c.id));
+  const W0 = host.clientWidth, H0 = host.clientHeight;
+  tracks.forEach((t, i) => {
+    let el = labelEls[i];
+    if (!el) { el = document.createElement('span'); host.appendChild(el); labelEls[i] = el; }
+    const [x0, x1, z0] = t.box;
+    bodyGroup.localToWorld(lv.set((x0 + x1) / 2, Math.max(t.h_max, 0) + 0.12, -z0));
+    lv.project(camera);
+    const vis = lv.z < 1 && Math.abs(lv.x) < 1.05 && Math.abs(lv.y) < 1.05;
+    el.style.display = vis ? '' : 'none';
+    if (!vis) return;
+    el.style.left = `${((lv.x + 1) / 2) * W0}px`;
+    el.style.top = `${((1 - lv.y) / 2) * H0}px`;
+    const name = LABEL[t.label] || t.label;
+    el.textContent = `${name}${t.label_conf && t.label_conf < 0.99 ? ` ${Math.round(t.label_conf * 100)}%` : ''} · ${t.r.toFixed(1)} m`;
+    el.className = cued.has(t.id) ? 'cued' : '';
+  });
+  for (let i = tracks.length; i < labelEls.length; i++) labelEls[i].style.display = 'none';
 }
 
 // ---------------------------------------------------------------- render
@@ -750,6 +782,7 @@ function animate() {
   }
   if (controls.enabled) controls.update();
   renderer.render(scene, camera);
+  drawLabels3d();
 }
 animate();
 connect();

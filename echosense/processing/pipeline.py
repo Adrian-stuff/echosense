@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from ..sensors.base import DepthFrame
 from .depthfilter import DepthFrontEnd
+from .objects import CLASSES, ObjectRecognizer, drop_label, shape_features
 
 UP = np.array([0.0, 1.0, 0.0])
 
@@ -123,6 +124,8 @@ class Obstacle:
     n_points: int
     in_path: bool
     suppressed: bool = False
+    full_id: int = 0  # whole-object segment (for recognition; the corridor split may cut objects)
+    features: np.ndarray | None = None
 
 
 @dataclass
@@ -150,6 +153,32 @@ class Track:
     vel_r: float = 0.0  # m/s, negative = approaching
     eligible_since: float | None = None  # capture time it first became reportable (latency reference)
     reporting: bool = False
+    probs: np.ndarray | None = None  # smoothed class probabilities from the recogniser
+    features: np.ndarray | None = None
+
+    @property
+    def label(self) -> str:
+        if self.kind in ("drop",):
+            return drop_label(self.h_min, self.width)
+        if self.kind == "edge":
+            return "curb"
+        # geometry already proves these, and it is more reliable than shape when objects touch
+        # (a sign fixed to a wall merges with the wall): free space below = overhang, all below
+        # knee height = low obstacle
+        if self.kind == "head":
+            return "overhang"
+        if self.kind == "low":
+            return "low"
+        if self.probs is None or self.hits < 3:
+            return "unknown"
+        i = int(np.argmax(self.probs))
+        return CLASSES[i] if self.probs[i] >= 0.45 else "unknown"
+
+    @property
+    def label_conf(self) -> float:
+        if self.kind in ("drop", "edge", "head", "low"):
+            return 1.0
+        return 0.0 if self.probs is None else float(self.probs.max())
 
     def el(self, ear_height: float) -> float:
         if self.kind == "head":
@@ -179,6 +208,7 @@ class Track:
                 "in_path": self.in_path, "suppressed": self.suppressed, "confirmed": self.confirmed,
                 "vel_r": round(self.vel_r, 2), "first_seen": self.first_seen, "eligible_since": self.eligible_since,
                 "ttc": None if self.ttc() is None else round(self.ttc(), 2), "r_urgent": round(self.urgency_range(), 3),
+                "label": self.label, "label_conf": round(self.label_conf, 2),
                 "box": [round(self.x_min, 3), round(self.x_max, 3), round(self.z_min, 3), round(self.z_max, 3)]}
 
 
@@ -207,6 +237,8 @@ class DepthProcessor:
         self.plane_ok = False
         self.rng = np.random.default_rng(7)
         self.front = DepthFrontEnd(self.p)
+        self.max_seen_depth = 0.0
+        self.recognizer = ObjectRecognizer(self.p.get("object_model") or None) if self.p.get("recognition", True) else None
         self.set_mount(cfg["sensor"]["mount_height"], cfg["sensor"]["mount_pitch_deg"])
 
     # ---------------------------------------------------------------- setup
@@ -238,12 +270,15 @@ class DepthProcessor:
         self.stride_used = s
         H, W = shape
         h, w = H // s, W // s
-        off = 0.0 if self.front.mode == "stride" else (s - 1) / 2  # block centres
+        ps = self.front.prestride if s % self.front.prestride == 0 else 1
+        off = 0.0 if self.front.mode == "stride" else (s - ps) / 2  # block centres (in full-res pixels)
         v, u = np.mgrid[0:h, 0:w].astype(np.float32)
         u, v = u * s + off, v * s + off
         self.xs = ((u - intr["cx"]) / intr["fx"]).ravel()
         self.ys = ((v - intr["cy"]) / intr["fy"]).ravel()
         self.cols = np.tile(np.arange(w, dtype=np.int32), h)
+        self.fx_used = float(intr["fx"])
+        self.vfov = math.degrees(2 * math.atan2(H / 2, intr["fy"]))
         # pixels whose ray meets the floor between 0.8 and 3.5 m: with a healthy sensor nearly all of
         # them return depth (floor or whatever stands on it), so their dropout rate measures sensing quality
         M = self.M
@@ -270,6 +305,9 @@ class DepthProcessor:
         quality = float((raw.ravel()[fm] > 0).mean()) if fm.any() else 1.0
         z = self.front(depth).ravel()
         valid = z > 0
+        if valid.any():  # the sensor's effective depth limit, learned from the data (any sensor model)
+            zmax = float(z[valid].max())
+            self.max_seen_depth = zmax if zmax > self.max_seen_depth else self.max_seen_depth * 0.9995 + zmax * 0.0005
         zc = z[valid]
         cols = self.cols[valid]
         xc, yc = self.xs[valid] * zc, self.ys[valid] * zc
@@ -292,10 +330,18 @@ class DepthProcessor:
         # the walking corridor is clustered on its own so that a wall or parked car beside the path
         # never merges with (and hides the distance of) an obstacle that is actually in the path
         corr = np.abs(X) <= p["corridor_half_width"]
+        rec = self.recognizer is not None  # shape features are computed even before a model is trained
+        full_lab = np.zeros(X.size, np.int32)
+        if rec and obst.any():
+            seg = self._segment(X[obst], Z[obst], cell, gw, gd)
+            if seg is not None:
+                full_lab[obst] = seg[0]
         found = []
         for part, in_path in ((obst & corr, True), (obst & ~corr, False)):
             found += self._clusters(X[part], Z[part], hgt[part], cell, gw, gd, drop=False, in_path=in_path,
-                                    cols=cols[part])
+                                    cols=cols[part], full=full_lab[part] if rec else None)
+        if rec:
+            self._describe(found, X, Z, hgt, full_lab)
         # for drop-off points, where the ray crossed the ground plane is the hole's lip
         if drop.any():
             sh = self._sensor_height()
@@ -421,7 +467,52 @@ class DepthProcessor:
                 "pitch": round(self.mount_pitch + pitch_err, 2), "plane": [round(float(v), 5) for v in self.plane]}
 
     # ------------------------------------------------------------- clusters
-    def _clusters(self, X, Z, Hh, cell, gw, gd, drop: bool, in_path: bool, cols=None) -> list[Obstacle]:
+    def _segment(self, X, Z, cell, gw, gd):
+        """Connected top-down grid segments of a point set: (label per point, number of segments)."""
+        nx, nz = int(round(2 * gw / cell)), int(round(gd / cell))
+        ix = np.clip(((X + gw) / cell).astype(np.int32), 0, nx - 1)
+        iz = np.clip((Z / cell).astype(np.int32), 0, nz - 1)
+        flat = iz * nx + ix
+        counts = np.bincount(flat, minlength=nx * nz).reshape(nz, nx)
+        zrow = (np.arange(nz) + 0.5) * cell
+        thr = np.maximum(2, np.round(self.p["min_cell_points"] * np.minimum(1.0, 2.0 / np.maximum(zrow, 0.5)))).astype(int)
+        labels, nlab = label8(counts >= thr[:, None])
+        if nlab == 0:
+            return None
+        return labels.ravel()[flat], nlab
+
+    def _seen_below(self, r: float) -> float:
+        """Lowest height the sensor sees at horizontal distance r: limited by the bottom edge of the
+        field of view and, far away, by the depth limit (measured along the tilted optical axis, so
+        the bottom of a distant object goes out of range before its top)."""
+        pitch = self.ground_info()["pitch"]
+        H = self._sensor_height()
+        lo = math.radians(pitch - getattr(self, "vfov", 60.0) / 2)
+        seen = H + r * math.tan(lo)
+        a = math.radians(-pitch)
+        if a > 0.01 and self.max_seen_depth > 0:
+            seen = max(seen, H - (self.max_seen_depth - r * math.cos(a)) / math.sin(a))
+        return max(0.0, seen)
+
+    def _describe(self, found, X, Z, hgt, full_lab):
+        """Shape features of each whole object an obstacle belongs to."""
+        p = self.p
+        cache = {}
+        top = p["user_height"] + p["head_margin"]
+        sh = self._sensor_height()
+        g = self.ground_info()
+        for ob in found:
+            if ob.kind in ("drop", "edge") or ob.full_id <= 0:
+                continue
+            if ob.full_id not in cache:
+                m = full_lab == ob.full_id
+                x, z, h = X[m], Z[m], hgt[m]
+                r = np.hypot(x, z)
+                cache[ob.full_id] = shape_features(x, z, h, r, float(np.percentile(r, 5)), self.stride_used,
+                                                   self.fx_used, sh, g["pitch"], self.vfov, top) if m.sum() >= 6 else None
+            ob.features = cache[ob.full_id]
+
+    def _clusters(self, X, Z, Hh, cell, gw, gd, drop: bool, in_path: bool, cols=None, full=None) -> list[Obstacle]:
         p = self.p
         if X.size < p["min_cluster_points"]:
             return []
@@ -466,7 +557,10 @@ class DepthProcessor:
             if drop:
                 kind = "drop"
                 h_min, h_max = float(h.min()), 0.0
-            elif h_min >= p["overhang_min_height"]:
+            elif h_min >= p["overhang_min_height"] and self._seen_below(r_near) < h_min - 0.25:
+                # free space below is only proven if the sensor actually saw below it: up close the
+                # bottom of the field of view cuts off the lower half of a tricycle, which must not
+                # be mistaken for an overhang
                 kind = "head"
             elif h_max <= p["low_max_height"]:
                 kind = "low"
@@ -479,9 +573,13 @@ class DepthProcessor:
                 # a wall, or a curb / drainage edge, running parallel to the direction of travel:
                 # it guides the user rather than blocking them, so it is not cued
                 kind, suppressed = ("edge" if drop else "wall"), True
-            out.append(Obstacle(kind, r_near, math.degrees(math.atan2(xn, zn)), xn, zn, float(h_min), float(h_max),
-                                float(x_min), float(x_max), float(z_min), float(z_max), int(sel.size), in_path,
-                                suppressed))
+            ob = Obstacle(kind, r_near, math.degrees(math.atan2(xn, zn)), xn, zn, float(h_min), float(h_max),
+                          float(x_min), float(x_max), float(z_min), float(z_max), int(sel.size), in_path, suppressed)
+            if full is not None:
+                fl = full[sel]
+                fl = fl[fl > 0]
+                ob.full_id = int(np.bincount(fl).argmax()) if fl.size else 0
+            out.append(ob)
         return out
 
     # -------------------------------------------------------------- tracker
@@ -519,6 +617,7 @@ class DepthProcessor:
             tr.width = ob.x_max - ob.x_min
             tr.x_min, tr.x_max, tr.z_min, tr.z_max = ob.x_min, ob.x_max, ob.z_min, ob.z_max
             tr.in_path, tr.suppressed = ob.in_path, ob.suppressed
+            self._recognise(tr, ob)
             if tr.kind != ob.kind and ob.kind != "drop":
                 tr.kind = ob.kind
             tr.last_seen = t
@@ -530,11 +629,21 @@ class DepthProcessor:
                 continue
             tr = Track(self._next_id, ob.kind, ob.x, ob.z, ob.r, ob.az, ob.h_min, ob.h_max, ob.x_max - ob.x_min,
                        ob.in_path, ob.suppressed, t, t, ob.x_min, ob.x_max, ob.z_min, ob.z_max)
+            self._recognise(tr, ob)
             if p["confirm_frames"] <= 1:
                 tr.confirmed, tr.confirmed_at = True, t
             self._next_id += 1
             self.tracks.append(tr)
         self.tracks = [tr for tr in self.tracks if t - tr.last_seen <= p["drop_time"]]
+
+    def _recognise(self, tr: Track, ob: Obstacle):
+        if ob.features is None or self.recognizer is None:
+            return
+        tr.features = ob.features
+        pr = self.recognizer.proba(ob.features)
+        if pr is None:
+            return
+        tr.probs = pr if tr.probs is None else 0.75 * tr.probs + 0.25 * pr  # labels settle over ~4 frames
 
     def _prioritise(self, range_limit: float, report_off_path: bool, t: float) -> list[Track]:
         bonus = self.p["priority_bonus"]

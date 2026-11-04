@@ -26,6 +26,8 @@ import numpy as np
 class DepthFrontEnd:
     def __init__(self, p: dict):
         self.stride = int(p["stride"])
+        # lite boards: sample every Nth pixel first, then filter the smaller image (1/N^2 of the work)
+        self.prestride = max(1, int(p.get("prestride", 1)))
         self.mode = p.get("downsample", "near_median")  # near_median | stride
         self.near_layer = float(p.get("near_layer", 0.25))
         self.hold_frames = int(p.get("hold_frames", 2))
@@ -41,6 +43,10 @@ class DepthFrontEnd:
         H, W = depth.shape
         h, w = H // s, W // s
         d = depth[: h * s, : w * s]
+        ps = self.prestride if s % self.prestride == 0 else 1
+        if ps > 1:
+            d = d[::ps, ::ps]
+            s //= ps
         if self.flying:
             d = remove_mixed_pixels(d)
         if self.mode == "stride" or s == 1:

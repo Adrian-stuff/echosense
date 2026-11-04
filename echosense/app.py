@@ -23,6 +23,7 @@ from .device.monitors import Battery, HealthMonitor, SessionLogger
 from .device.perf import PerfMonitor
 from .device.settings import MODES, RANGES, SettingsStore
 from .device.training import Trainer
+from .processing.objects import SPOKEN
 from .processing.pipeline import DepthProcessor
 from .sim.world import list_scenes
 from .sensors.presets import PRESETS, coverage
@@ -68,6 +69,8 @@ class EchoSense:
         self._last_packet = 0.0
         self._contacts_seen = 0
         self._pinged_tracks: set = set()
+        self._announced: dict = {}
+        self._last_announce = 0.0
         self.m_frames: deque = deque(maxlen=60)
         self.m_proc: deque = deque(maxlen=120)
         self.m_e2e: deque = deque(maxlen=50)
@@ -208,6 +211,8 @@ class EchoSense:
                 rep = [o for o in rep if o["r"] <= s.warning_distance]
             for rank, o in enumerate(rep[: self.cfg["audio"]["max_cues"]]):
                 cues.append({**o, "rank": rank, "t_frame": frame.t_capture})
+        if s.power and s.announce and not self.trainer.active and self.health.state != "blocked":
+            self._auto_announce(res.reported, frame.t_capture)
         self.sonifier.range_limit = rng if not self.trainer.active else 4.0
         self.sonifier.set_cues(cues)
         self.cues = cues
@@ -254,6 +259,44 @@ class EchoSense:
             self.speech.say(ph[warn].format(battery=self.battery.percent), "alarm")
             self.logger.write("alert", state=warn, battery=self.battery.percent)
 
+    # ------------------------------------------------------- what's ahead
+    def _direction(self, az: float) -> str:
+        ph = self.cfg["phrases"]
+        if abs(az) < 8:
+            return ph["dir_ahead"]
+        if abs(az) < 22:
+            return ph["dir_slight_right"] if az > 0 else ph["dir_slight_left"]
+        return ph["dir_right"] if az > 0 else ph["dir_left"]
+
+    def describe_scene(self) -> str:
+        """Spoken summary of what is ahead (the "What's ahead?" button): up to three obstacles,
+        in-path first, nearest first, with their recognised type."""
+        ph, s = self.cfg["phrases"], self.settings.s
+        rng = self.cfg["ranges"][s.range]
+        res = self.last_result
+        items = []
+        if res is not None:
+            cands = [t for t in res.tracks if t.confirmed and not t.suppressed and t.r <= max(rng, 2.5)]
+            cands.sort(key=lambda t: (0 if t.in_path else 1, t.r))
+            for t in cands[:3]:
+                m = round(t.r * 2) / 2
+                item = ph["describe_item"].format(label=SPOKEN.get(t.label, "Obstacle"), meters=f"{m:g}",
+                                                  direction=self._direction(t.az))
+                items.append(item.replace(" 1 meters", " 1 meter"))
+        return ". ".join(items) + "." if items else ph["describe_none"].format(range=rng)
+
+    def _auto_announce(self, reported: list, t: float):
+        ph = self.cfg["phrases"]
+        for o in reported:
+            if o["label"] in ("person", "vehicle") and o["id"] not in self._announced and o["label_conf"] >= 0.6:
+                self._announced[o["id"]] = t
+                if t - self._last_announce > 3.0:
+                    self._last_announce = t
+                    self.speech.say(ph["announce"].format(label=SPOKEN[o["label"]], direction=self._direction(o["az"])))
+                    break
+        if len(self._announced) > 200:
+            self._announced = dict(list(self._announced.items())[-100:])
+
     def _on_ping(self, cue: dict, onset: float, first: bool):
         if "t_frame" in cue:
             self.m_age.append((onset - cue["t_frame"]) * 1000)
@@ -294,7 +337,8 @@ class EchoSense:
             "quality": round(self.health.quality, 3), "coverage": self.coverage(),
             "mount": {"height": self.processor.mount_height, "pitch": self.processor.mount_pitch},
             "intr": intr, "tracks": [t.to_dict(self.cfg["audio"]["ear_height"]) for t in res.tracks],
-            "reported": [o["id"] for o in res.reported], "cues": [{k: c.get(k) for k in ("id", "kind", "r", "az", "el", "rank", "ttc", "r_urgent")} for c in cues],
+            "reported": [o["id"] for o in res.reported], "cues": [{k: c.get(k) for k in ("id", "kind", "r", "az", "el", "rank", "ttc", "r_urgent", "label", "label_conf")} for c in cues],
+            "recognition": self.processor.recognizer is not None and self.processor.recognizer.available,
             "pose": frame.extra.get("pose"), "movers": frame.extra.get("movers"), "contacts": frame.extra.get("contacts", 0),
             "scene_version": frame.extra.get("scene_version"),
             "health": self.health.state, "battery": {"percent": self.battery.percent, "charging": self.battery.charging},
@@ -353,6 +397,10 @@ class EchoSense:
             self.speech.say(ph["mode_" + nm], "confirm")
         elif name == "battery":
             self.speech.say(ph["battery"].format(battery=self.battery.percent), "confirm")
+        elif name == "describe":
+            text = self.describe_scene()
+            self.speech.say(text)
+            self.logger.write("describe", text=text)
         elif name == "status":
             sensor = {"ok": "Sensor OK", "blocked": "Sensor blocked", "no_data": "Sensor not responding",
                       "degraded": "Depth sensing degraded"}.get(
@@ -404,7 +452,7 @@ class EchoSense:
 
     # ================================================== console commands
     def set_setting(self, key: str, value):
-        if key in ("report_off_path",):
+        if key in ("report_off_path", "announce"):
             self.settings.update(**{key: bool(value)})
         elif key == "warning_distance":
             self.settings.update(warning_distance=float(value))

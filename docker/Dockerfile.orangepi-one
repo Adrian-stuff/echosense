@@ -1,0 +1,25 @@
+# Virtual Orange Pi One: 32-bit ARM (armhf), Debian 12 (what Armbian for the One is based on),
+# 512 MB, Kinect v1 driver from apt, the orangepi_one lite profile.
+#
+# Apple Silicon has no 32-bit ARM mode, so this runs under QEMU emulation: use it to check the
+# software installs and runs on armhf, not to judge speed (run `echosense perf` on the board).
+FROM --platform=linux/arm/v7 debian:bookworm-slim
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Manila LANG=C.UTF-8
+RUN useradd -m -s /bin/bash orangepi && groupadd -f plugdev
+
+COPY pyproject.toml README.md /opt/echosense/src/
+COPY echosense /opt/echosense/src/echosense
+COPY deploy /opt/echosense/src/deploy
+COPY tests /opt/echosense/src/tests
+RUN /opt/echosense/src/deploy/install_orangepi_one.sh --no-systemd \
+ && /opt/echosense/venv/bin/pip install --no-cache-dir --no-deps pytest iniconfig pluggy packaging exceptiongroup \
+ && ln -s /opt/echosense/venv/bin/echosense /usr/local/bin/echosense \
+ && chown -R orangepi:orangepi /opt/echosense/src && rm -rf /var/lib/apt/lists/*
+
+USER orangepi
+WORKDIR /home/orangepi
+ENV ECHOSENSE_PROFILE=orangepi_one
+EXPOSE 8080
+CMD ["echosense", "run", "--source", "auto", "--audio", "none", "--no-browser"]

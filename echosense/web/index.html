@@ -31,6 +31,7 @@
   <section class="viewport" id="viewport">
     <canvas id="three"></canvas>
     <div class="hud tl" id="cue-hud"></div>
+    <div id="labels3d" class="labels3d"></div>
     <div class="hud tr">
       <div class="seg small" id="views">
         <button data-view="follow" class="on">Follow</button>
@@ -93,6 +94,7 @@
         <button data-action="battery">Battery <kbd>B</kbd></button>
         <button data-action="status">Status <kbd>I</kbd></button>
         <button data-action="training" id="b-training">Training <kbd>T</kbd></button>
+        <button data-action="describe" id="b-describe" class="wide">What's ahead? <kbd>Space</kbd></button>
       </div>
       <div class="kv" id="settings-kv"></div>
     </div>
@@ -122,6 +124,7 @@
         <div class="seg small" id="zone"><button data-zone="corridor">Walking corridor</button><button data-zone="fov">Full field of view</button></div></div>
       <div class="checks">
 
+        <label><input type="checkbox" id="c-announce"> Announce people and vehicles automatically</label>
         <label id="mirror-wrap" hidden><input type="checkbox" id="c-mirror"> Mirror Kinect image</label>
       </div>
       <label class="field">Warning distance <input type="range" id="c-warn" min="0.5" max="3" step="0.1"><output id="o-warn"></output></label>
