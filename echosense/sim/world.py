@@ -23,22 +23,24 @@ import numpy as np
 
 from ..config import SCENES_DIR
 
-# name: axial-noise multiplier, dropout probability, pass-through probability
+# name: axial-noise multiplier, dropout probability, pass-through probability, extra dropout at max range
+# (low-albedo surfaces return less IR the farther they are: dark fabric and foliage fade out first)
 MATERIALS = {
-    "asphalt": (1.2, 0.004, 0.0),
-    "concrete": (1.0, 0.002, 0.0),
-    "metal": (1.6, 0.04, 0.0),
-    "glass": (2.5, 0.20, 0.70),
-    "fabric": (1.3, 0.06, 0.0),
-    "foliage": (3.0, 0.10, 0.35),
-    "skin": (1.2, 0.01, 0.0),
-    "wood": (1.1, 0.005, 0.0),
+    "asphalt": (1.2, 0.004, 0.0, 0.10),
+    "concrete": (1.0, 0.002, 0.0, 0.02),
+    "metal": (1.6, 0.04, 0.0, 0.08),
+    "glass": (2.5, 0.20, 0.70, 0.05),
+    "fabric": (1.3, 0.06, 0.0, 0.30),
+    "foliage": (3.0, 0.10, 0.35, 0.25),
+    "skin": (1.2, 0.01, 0.0, 0.05),
+    "wood": (1.1, 0.005, 0.0, 0.04),
 }
 MAT_NAMES = list(MATERIALS)
 MAT_INDEX = {n: i for i, n in enumerate(MAT_NAMES)}
 MAT_NOISE = np.array([MATERIALS[n][0] for n in MAT_NAMES], np.float32)
 MAT_DROPOUT = np.array([MATERIALS[n][1] for n in MAT_NAMES], np.float32)
 MAT_PASS = np.array([MATERIALS[n][2] for n in MAT_NAMES], np.float32)
+MAT_RANGE_DROP = np.array([MATERIALS[n][3] for n in MAT_NAMES], np.float32)
 
 INF = np.float32(np.inf)
 
@@ -399,7 +401,8 @@ class World:
 class CameraModel:
     """Pinhole model + Kinect v2 style sensor noise."""
 
-    def __init__(self, width, height, fx, fy, cx, cy, min_depth=0.5, max_depth=4.5):
+    def __init__(self, width, height, fx, fy, cx, cy, min_depth=0.5, max_depth=4.5, noise=(0.0015, 0.0008)):
+        self.noise_a, self.noise_b = float(noise[0]), float(noise[1])
         self.width, self.height = int(width), int(height)
         self.fx, self.fy, self.cx, self.cy = float(fx), float(fy), float(cx), float(cy)
         self.min_depth, self.max_depth = float(min_depth), float(max_depth)
@@ -408,7 +411,8 @@ class CameraModel:
 
     @classmethod
     def from_config(cls, s: dict) -> "CameraModel":
-        return cls(s["width"], s["height"], s["fx"], s["fy"], s["cx"], s["cy"], s["min_depth"], s["max_depth"])
+        return cls(s["width"], s["height"], s["fx"], s["fy"], s["cx"], s["cy"], s["min_depth"], s["max_depth"],
+                   s.get("noise", (0.0015, 0.0008)))
 
     def window(self, lo, hi, o, R):
         """Image-space bounding rectangle (v0, v1, u0, u1) of a world AABB, or None."""
@@ -434,13 +438,20 @@ class CameraModel:
         H, W = zbuf.shape
         hit = np.isfinite(zbuf)
         z = np.where(hit, zbuf, 0.0).astype(np.float32)
-        sigma = (0.0015 + 0.0008 * z * z) * MAT_NOISE[mat] * (1.0 + 2.0 * sun)
+        sigma = (self.noise_a + self.noise_b * z * z) * MAT_NOISE[mat] * (1.0 + 2.0 * sun)
         z += rng.standard_normal((H, W), dtype=np.float32) * sigma
         z[~hit] = 0.0
-        p_drop = MAT_DROPOUT[mat]
+        zr = (z / self.max_depth) ** 2
+        p_drop = MAT_DROPOUT[mat] + MAT_RANGE_DROP[mat] * zr
         if sun > 0:
-            p_drop = p_drop + sun * (0.04 + 0.5 * (z / self.max_depth) ** 2)
+            p_drop = p_drop + sun * (0.04 + 0.5 * zr)
         z[rng.random((H, W), dtype=np.float32) < p_drop] = 0.0
+        if sun > 0:
+            # sunlight saturates the IR sensor in patches, not scattered pixels: a coarse random field
+            # (about 16 px cells) blanks whole regions, more often at range
+            cells = rng.random((H // 16 + 1, W // 16 + 1), dtype=np.float32)
+            field = np.repeat(np.repeat(cells, 16, 0), 16, 1)[:H, :W]
+            z[field < sun * (0.06 + 0.3 * zr)] = 0.0
         # flying pixels between foreground and background along depth edges
         a, b = z[:, :-1], z[:, 1:]
         dz = b - a

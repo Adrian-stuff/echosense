@@ -8,28 +8,41 @@ from pathlib import Path
 
 
 class HealthMonitor:
-    """Detects a blocked lens or a silent / disconnected sensor (proposal C8).
+    """Detects a blocked lens, a silent / disconnected sensor, and degraded sensing (proposal C8).
 
-    States: ``starting`` -> ``ok`` | ``blocked`` | ``no_data``.
-    ``tick`` returns the new state on a transition, ``"repeat"`` when an
-    active fault should be announced again, otherwise None.
+    States: ``starting`` -> ``ok`` | ``degraded`` | ``blocked`` | ``no_data``.
+    ``degraded`` means the sensor works but loses many returns (direct sunlight, a dirty lens, very
+    dark or shiny surroundings): cues continue and the user is told to take extra care.
+    ``tick`` returns the new state on a transition, ``"repeat"`` when an active fault should be
+    announced again, otherwise None.
     """
 
     def __init__(self, cfg: dict):
         self.cfg = cfg
+        self.reset()
+
+    def reset(self):
         self.state = "starting"
         self.last_frame = None
         self.low_since = None
+        self.poor_since = None
         self.last_alert = 0.0
         self.valid_ratio = 0.0
+        self.quality = 1.0
 
-    def on_frame(self, t: float, valid_ratio: float):
+    def on_frame(self, t: float, valid_ratio: float, quality: float = 1.0):
         self.last_frame = t
         self.valid_ratio = valid_ratio
+        self.quality += 0.2 * (quality - self.quality)  # smoothed: flicker alone is not a fault
         if valid_ratio < self.cfg["blocked_valid_ratio"]:
             self.low_since = self.low_since or t
         else:
             self.low_since = None
+        thr = self.cfg.get("degraded_quality", 0.6) + (0.1 if self.state == "degraded" else 0.0)  # hysteresis
+        if self.quality < thr:
+            self.poor_since = self.poor_since or t
+        else:
+            self.poor_since = None
 
     def tick(self, t: float):
         c = self.cfg
@@ -37,6 +50,8 @@ class HealthMonitor:
             new = "no_data" if (self.last_frame is not None or self.state != "starting") else "starting"
         elif self.low_since is not None and t - self.low_since > c["blocked_time"]:
             new = "blocked"
+        elif self.poor_since is not None and t - self.poor_since > c.get("degraded_time", 1.5):
+            new = "degraded"
         else:
             new = "ok"
         if new != self.state:
@@ -46,10 +61,10 @@ class HealthMonitor:
         if new in ("blocked", "no_data") and t - self.last_alert > c["alert_repeat"]:
             self.last_alert = t
             return "repeat"
+        if new == "degraded" and t - self.last_alert > 4 * c["alert_repeat"]:
+            self.last_alert = t
+            return "repeat"
         return None
-
-    def reset(self):
-        self.state, self.last_frame, self.low_since = "starting", None, None
 
 
 class Battery:

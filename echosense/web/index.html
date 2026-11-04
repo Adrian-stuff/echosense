@@ -46,6 +46,7 @@
         <label><input type="checkbox" id="t-boxes" checked> Obstacles</label>
         <label><input type="checkbox" id="t-frustum" checked> Frustum</label>
         <label><input type="checkbox" id="t-depthcolor"> Depth colours</label>
+        <label title="Field of view of this 3D view (not the sensor)">View FOV <input type="range" id="t-vfov" min="35" max="110" step="1" value="60" style="width:80px"><output id="o-vfov">60°</output></label>
       </div>
       <div class="legend">
       <span><i style="background:var(--k-body)"></i>body height</span>
@@ -99,6 +100,7 @@
     <div class="card" id="sim-card">
       <h3>Simulator <small>walk: W/S · strafe A/D · turn Q/E or ←/→ · V view</small></h3>
       <label class="field">Scene <select id="scene"></select></label>
+      <label class="field">Sensor model <select id="preset"></select></label>
       <p class="desc" id="scene-desc"></p>
       <div class="checks">
         <label><input type="checkbox" id="s-autowalk"> Auto-walk route</label>
@@ -115,8 +117,11 @@
       <label class="field">Mount height <input type="range" id="m-height" min="0.9" max="1.6" step="0.01"><output id="o-height"></output></label>
       <label class="field">Mount tilt <input type="range" id="m-pitch" min="-35" max="10" step="0.5"><output id="o-pitch"></output></label>
       <div class="inline"><button id="m-cal">Calibrate from floor</button><span class="meta" id="ground-est"></span></div>
+      <div class="coverage" id="coverage"></div>
+      <div class="field"><span>Detection zone</span>
+        <div class="seg small" id="zone"><button data-zone="corridor">Walking corridor</button><button data-zone="fov">Full field of view</button></div></div>
       <div class="checks">
-        <label><input type="checkbox" id="c-offpath"> Report obstacles outside the walking corridor</label>
+
         <label id="mirror-wrap" hidden><input type="checkbox" id="c-mirror"> Mirror Kinect image</label>
       </div>
       <label class="field">Warning distance <input type="range" id="c-warn" min="0.5" max="3" step="0.1"><output id="o-warn"></output></label>

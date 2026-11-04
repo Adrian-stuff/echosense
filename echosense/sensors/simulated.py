@@ -10,6 +10,7 @@ import numpy as np
 
 from ..sim.world import CameraModel, World, camera_rotation
 from .base import DepthSource
+from .presets import PRESETS, SPEC_KEYS
 
 
 class SimulatedKinect(DepthSource):
@@ -25,9 +26,12 @@ class SimulatedKinect(DepthSource):
         super().__init__()
         self.cfg = cfg
         s = cfg["sensor"]
-        self.cam = CameraModel.from_config(s)
-        self.intrinsics = {k: s[k] for k in ("width", "height", "fx", "fy", "cx", "cy")}
-        self.fps = float(s.get("fps", 30))
+        self.preset = cfg.get("sim", {}).get("sensor_preset", "kinect_v2")
+        self.sensor = {**s, **PRESETS.get(self.preset, PRESETS["kinect_v2"])}
+        self.label = f"Simulated {self.sensor['label'].split(' (')[0]}"
+        self.cam = CameraModel.from_config(self.sensor)
+        self.intrinsics = {k: self.sensor[k] for k in ("width", "height", "fx", "fy", "cx", "cy")}
+        self.fps = float(self.sensor.get("fps", 30))
         self.rng = np.random.default_rng(seed)
         self.mount_height = float(s["mount_height"])
         self.mount_pitch = float(s["mount_pitch_deg"])
@@ -74,7 +78,7 @@ class SimulatedKinect(DepthSource):
         if use_process:
             ctx = mp.get_context("spawn")
             self._conn, child = ctx.Pipe()
-            self._proc = ctx.Process(target=_render_worker, args=(child, self.cfg["sensor"], int(self.rng.integers(1 << 30))),
+            self._proc = ctx.Process(target=_render_worker, args=(child, self.sensor, int(self.rng.integers(1 << 30))),
                                      name="sim-kinect-render", daemon=True)
             self._proc.start()
         self._thread = threading.Thread(target=self._run, name="sim-kinect", daemon=True)
@@ -195,6 +199,9 @@ class SimulatedKinect(DepthSource):
         o, R, pitch = self.sensor_pose()
         depth = self.world.render(o, R, self.cam, self.rng, sun=self.sun, blocked=self.blocked)
         return depth, self._extra(o, pitch)
+
+    def spec(self, cfg: dict) -> dict:
+        return {k: self.sensor[k] for k in SPEC_KEYS} | {"preset": self.preset}
 
     def info(self):
         d = super().info()

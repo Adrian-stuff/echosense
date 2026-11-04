@@ -46,6 +46,11 @@ class Kinect1Source(DepthSource):
             depth_mm, _ts = res
             self._publish(depth_mm.astype(np.float32) * 0.001, time.monotonic())
 
+    def spec(self, cfg: dict) -> dict:
+        d = super().spec(cfg)
+        d.update(model="kinect_v1", min_depth=0.5, max_depth=4.0)
+        return d
+
     def stop(self):
         super().stop()
         try:

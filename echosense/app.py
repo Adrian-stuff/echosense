@@ -25,6 +25,7 @@ from .device.settings import MODES, RANGES, SettingsStore
 from .device.training import Trainer
 from .processing.pipeline import DepthProcessor
 from .sim.world import list_scenes
+from .sensors.presets import PRESETS, coverage
 from .sensors import Recorder, SimulatedKinect, SourceError, available_sources, open_source
 
 
@@ -194,14 +195,14 @@ class EchoSense:
         res = self.processor.process(frame, range_limit=rng, report_off_path=s.report_off_path,
                                      ear_height=self.cfg["audio"]["ear_height"])
         self.last_result = res
-        self.health.on_frame(frame.t_capture, res.valid_ratio)
+        self.health.on_frame(frame.t_capture, res.valid_ratio, res.quality)
         self.m_frames.append(frame.t_capture)
         self.m_proc.append(res.timings["total"])
 
         cues = []
         if s.power and self.trainer.active:
             cues = self.trainer.cues()
-        elif s.power and self.health.state in ("ok", "starting"):
+        elif s.power and self.health.state in ("ok", "starting", "degraded"):
             rep = res.reported
             if s.mode == "warning":
                 rep = [o for o in rep if o["r"] <= s.warning_distance]
@@ -243,6 +244,9 @@ class EchoSense:
             elif st in ("blocked", "no_data"):
                 self.speech.say(ph["sensor_" + st], "alarm")
                 self.logger.write("alert", state=st)
+            elif st == "degraded":
+                self.speech.say(ph["sensor_degraded"], "limit")
+                self.logger.write("alert", state=st, quality=round(self.health.quality, 2))
             elif st == "repeat":
                 self.speech.say(ph["sensor_" + self.health.state], "alarm")
         warn = self.battery.update()
@@ -287,9 +291,10 @@ class EchoSense:
         state = {
             "type": "frame", "seq": frame.seq, "source": frame.source, "source_label": getattr(src, "label", ""),
             "timings": res.timings, "valid_ratio": round(res.valid_ratio, 3), "ground": res.ground,
+            "quality": round(self.health.quality, 3), "coverage": self.coverage(),
             "mount": {"height": self.processor.mount_height, "pitch": self.processor.mount_pitch},
             "intr": intr, "tracks": [t.to_dict(self.cfg["audio"]["ear_height"]) for t in res.tracks],
-            "reported": [o["id"] for o in res.reported], "cues": [{k: c.get(k) for k in ("id", "kind", "r", "az", "el", "rank")} for c in cues],
+            "reported": [o["id"] for o in res.reported], "cues": [{k: c.get(k) for k in ("id", "kind", "r", "az", "el", "rank", "ttc", "r_urgent")} for c in cues],
             "pose": frame.extra.get("pose"), "movers": frame.extra.get("movers"), "contacts": frame.extra.get("contacts", 0),
             "scene_version": frame.extra.get("scene_version"),
             "health": self.health.state, "battery": {"percent": self.battery.percent, "charging": self.battery.charging},
@@ -349,7 +354,8 @@ class EchoSense:
         elif name == "battery":
             self.speech.say(ph["battery"].format(battery=self.battery.percent), "confirm")
         elif name == "status":
-            sensor = {"ok": "Sensor OK", "blocked": "Sensor blocked", "no_data": "Sensor not responding"}.get(
+            sensor = {"ok": "Sensor OK", "blocked": "Sensor blocked", "no_data": "Sensor not responding",
+                      "degraded": "Depth sensing degraded"}.get(
                 self.health.state, "Sensor starting")
             self.speech.say(ph["status"].format(sensor=sensor, range=s.range, mode=s.mode.capitalize(),
                                                 battery=self.battery.percent), "confirm")
@@ -436,6 +442,16 @@ class EchoSense:
             self.processor.reset()
             self._contacts_seen = 0
             self.event("scene", f"Scene: {sim.world.scene.get('name')}", scene=sim.world.to_dict())
+        elif key == "sensor_preset":
+            if value not in PRESETS:
+                self.event("warning", f"unknown sensor preset {value}")
+                return
+            self.cfg.setdefault("sim", {})["sensor_preset"] = value
+            pose = (sim.x, sim.z, math.degrees(sim.yaw))
+            self.switch_source("sim")
+            if self.sim:
+                self.sim.set_pose(*pose)
+            self.event("info", f"Simulated sensor: {PRESETS[value]['label']}")
         elif key == "reset":
             sim.reset_pose()
             self.processor.reset()
@@ -468,10 +484,20 @@ class EchoSense:
             self.event("training", f"Target {tr['target_az']:+.0f} deg, answered {tr['response_az']:+.0f} deg, "
                                    f"error {tr['error_deg']:.0f} deg", trial=tr)
 
+    def sensor_spec(self) -> dict:
+        return self.source.spec(self.cfg) if self.source else dict(self.cfg["sensor"])
+
+    def coverage(self) -> dict:
+        p = self.cfg["processing"]
+        return coverage(self.sensor_spec(), self.processor.mount_height, self.processor.mount_pitch,
+                        head_height=1.7, corridor_half=p["corridor_half_width"])
+
     def hello(self) -> dict:
         sim = self.sim
         return {"type": "hello", "version": 1, "profile": self.cfg.get("device_profile"),
-                "sensor": self.cfg["sensor"], "processing": self.cfg["processing"], "ranges": self.cfg["ranges"],
+                "sensor": self.sensor_spec(), "processing": self.cfg["processing"], "ranges": self.cfg["ranges"],
+                "sensor_presets": {k: v["label"] for k, v in PRESETS.items()},
+                "sensor_preset": self.cfg.get("sim", {}).get("sensor_preset", "kinect_v2"),
                 "sources": available_sources(self.cfg), "source": getattr(self.source, "kind", None),
                 "scene": sim.world.to_dict() if sim else None, "scenes": list_scenes(),
                 "settings": self.settings.to_dict(), "profiles": list(PROFILES), "events": list(self.events)[-30:],

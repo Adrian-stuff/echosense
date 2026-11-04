@@ -11,6 +11,7 @@ const KIND = {
   low: { color: 0x45c8f5, label: 'Low obstacle', sound: 'low tone' },
   drop: { color: 0xa98bff, label: 'Drop-off', sound: 'falling sweep' },
   wall: { color: 0x5b6878, label: 'Parallel wall', sound: 'suppressed' },
+  edge: { color: 0x5b6878, label: 'Parallel curb', sound: 'suppressed' },
 };
 const MAT_COLOR = { concrete: 0x8a96a6, metal: 0x7fa7c9, glass: 0x9fe9ff, fabric: 0xc78bd6, foliage: 0x5fbf6a,
   wood: 0xc8a27a, skin: 0xe0b49a, asphalt: 0x555f6b };
@@ -374,13 +375,14 @@ function cueInterval(r, rank, rng) {
 }
 function drawRadar(s) {
   const cv = $('radar'), g = rctx, Wd = cv.width, Hd = cv.height;
-  const ox = Wd / 2, oy = Hd - 10, scale = (Hd - 22) / 4.5;
+  const maxR = hello.sensor.max_depth;
+  const ox = Wd / 2, oy = Hd - 10, scale = Math.min((Hd - 22) / maxR, (Wd / 2 - 6) / (maxR * Math.sin(Math.min(Math.PI / 2, Math.atan2((s.intr.w * s.intr.stride) / 2, s.intr.fx)))));
   g.clearRect(0, 0, Wd, Hd);
   const half = Math.atan2((s.intr.w * s.intr.stride) / 2, s.intr.fx);
   g.fillStyle = 'rgba(61,214,196,0.06)';
-  g.beginPath(); g.moveTo(ox, oy); g.arc(ox, oy, 4.5 * scale, -Math.PI / 2 - half, -Math.PI / 2 + half); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(ox, oy); g.arc(ox, oy, maxR * scale, -Math.PI / 2 - half, -Math.PI / 2 + half); g.closePath(); g.fill();
   g.strokeStyle = '#243040'; g.fillStyle = '#5b6878'; g.font = '10px ui-sans-serif'; g.lineWidth = 1;
-  for (let r = 1; r <= 4; r++) { g.beginPath(); g.arc(ox, oy, r * scale, Math.PI, 2 * Math.PI); g.stroke(); g.fillText(`${r} m`, ox + r * scale * 0.71 + 2, oy - r * scale * 0.71); }
+  for (let r = 1; r <= Math.floor(maxR); r++) { g.beginPath(); g.arc(ox, oy, r * scale, Math.PI, 2 * Math.PI); g.stroke(); g.fillText(`${r} m`, ox + r * scale * 0.71 + 2, oy - r * scale * 0.71); }
   const cw = hello.processing.corridor_half_width * scale;
   g.strokeStyle = 'rgba(61,214,196,0.35)'; g.setLineDash([3, 3]);
   g.beginPath(); g.moveTo(ox - cw, oy); g.lineTo(ox - cw, 6); g.moveTo(ox + cw, oy); g.lineTo(ox + cw, 6); g.stroke();
@@ -402,7 +404,7 @@ function drawRadar(s) {
     g.fillRect(px - wpx / 2, py - 3, wpx, 6);
     const c = cued.get(t.id);
     if (c) {
-      const per = cueInterval(t.r, c.rank, s.range_m);
+      const per = cueInterval(t.r_urgent ?? t.r, c.rank, s.range_m);
       const ph = (now % per) / per;
       g.strokeStyle = col; g.lineWidth = 2; g.globalAlpha = 1 - ph;
       g.beginPath(); g.arc(px, py, 6 + ph * 14, 0, 2 * Math.PI); g.stroke();
@@ -418,7 +420,7 @@ const sideTxt = (az) => (Math.abs(az) < 4 ? 'ahead' : `${Math.abs(az).toFixed(0)
 
 function updatePanels(s) {
   const m = s.metrics;
-  const hl = { ok: ['sensor ok', 'ok'], blocked: ['SENSOR BLOCKED', 'bad'], no_data: ['NO SENSOR DATA', 'bad'], starting: ['starting', 'warn'] }[s.health] || [s.health, ''];
+  const hl = { ok: ['sensor ok', 'ok'], degraded: [`sensing degraded ${(s.quality * 100).toFixed(0)}%`, 'warn'], blocked: ['SENSOR BLOCKED', 'bad'], no_data: ['NO SENSOR DATA', 'bad'], starting: ['starting', 'warn'] }[s.health] || [s.health, ''];
   pill('p-health', hl[0], hl[1]);
   pill('p-fps', `${m.fps.toFixed(0)} fps`, m.fps >= 15 ? '' : 'warn');
   pill('p-proc', `${m.process_ms ? m.process_ms.mean.toFixed(1) : '—'} ms`);
@@ -438,15 +440,15 @@ function updatePanels(s) {
     html = `<div class="cue"><div class="big">Training ${t ? `· ${t.kind} · ${t.r} m · ${sideTxt(t.az)}` : '· blind trial'}</div><div class="sub">${t ? 'stationary practice target' : 'click the dial where the sound seems to be'}</div></div>`;
   } else if (s.cues.length) {
     const c = s.cues[0], k = KIND[c.kind] || KIND.body;
-    const per = cueInterval(c.r, 0, s.range_m);
     html = `<div class="cue" style="border-left-color:#${k.color.toString(16).padStart(6, '0')}"><div class="big">${k.label} · ${c.r.toFixed(2)} m · ${sideTxt(c.az)}</div>` +
-      `<div class="sub">${k.sound}, every ${per.toFixed(2)} s · elevation ${c.el >= 0 ? '+' : ''}${c.el.toFixed(0)}°</div>` +
+      `<div class="sub">${k.sound}, every ${cueInterval(c.r_urgent ?? c.r, 0, s.range_m).toFixed(2)} s · elevation ${c.el >= 0 ? '+' : ''}${c.el.toFixed(0)}°` +
+      `${c.ttc != null ? ` · <b>approaching, contact in ${c.ttc.toFixed(1)} s</b>` : ''}</div>` +
       (s.cues[1] ? `<div class="sub">also: ${KIND[s.cues[1].kind]?.label} ${s.cues[1].r.toFixed(2)} m ${sideTxt(s.cues[1].az)} (quieter)</div>` : '') + '</div>';
   } else html = `<div class="cue quiet"><div class="big">Path clear</div><div class="sub">${set.mode === 'warning' ? `silent until something is within ${set.warning_distance} m` : `nothing in the corridor within ${s.range_m} m`}</div></div>`;
   hud.innerHTML = html;
 
   const t = s.timings;
-  $('frame-meta').textContent = `#${s.seq} · ${s.intr.w}×${s.intr.h} (÷${s.intr.stride}) · valid ${(s.valid_ratio * 100).toFixed(0)}% · ` +
+  $('frame-meta').textContent = `#${s.seq} · ${s.intr.w}×${s.intr.h} (÷${s.intr.stride}) · valid ${(s.valid_ratio * 100).toFixed(0)}% · sensing quality ${(s.quality * 100).toFixed(0)}% · ` +
     `project ${t.project} · ground ${t.ground} · cluster ${t.cluster} · track ${t.track} ms` +
     (m.data_age_ms ? ` · cue data age ${m.data_age_ms.mean.toFixed(0)} ms` : '');
 
@@ -467,7 +469,19 @@ function updatePanels(s) {
   syncSlider('m-pitch', s.mount.pitch, 'o-pitch', (v) => `${(+v).toFixed(1)}°`);
   syncSlider('c-warn', set.warning_distance, 'o-warn', (v) => `${(+v).toFixed(1)} m`);
   syncSlider('s-batt', s.battery.percent, 'o-batt', (v) => `${(+v).toFixed(0)}%`);
-  $('c-offpath').checked = set.report_off_path;
+  document.querySelectorAll('#zone button').forEach((b) => b.classList.toggle('on', (b.dataset.zone === 'fov') === !!set.report_off_path));
+  const cv = s.coverage;
+  if (cv) {
+    const m = (v, gapText) => (v == null ? `<span class="gap">${gapText}</span>` : `from ${v.toFixed(2)} m`);
+    $('coverage').innerHTML = [
+      ['Sensor', `${hello.sensor.label || hello.sensor.model} · ${cv.hfov}° × ${cv.vfov}° · ${cv.min_depth}–${cv.max_depth} m`],
+      ['Floor visible', m(cv.floor_from, 'never (tilt down)')],
+      [`Head height (${cv.head_height} m)`, m(cv.head_from, 'not covered (tilt up)')],
+      ['Full corridor width', m(cv.corridor_from, 'beyond range')],
+      ['View width at 2 m', `${cv.width_at_2m.toFixed(2)} m`],
+    ].map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('') +
+      `<dt></dt><dd class="meta">Closer than these distances the sensor is blind at that height.</dd>`;
+  }
   $('mirror-wrap').hidden = s.source !== 'kinect2';
   $('ground-est').textContent = s.ground.ok ? `floor says ${s.ground.height.toFixed(2)} m, ${s.ground.pitch.toFixed(1)}°` : 'floor not visible';
   $('b-log').textContent = s.logging ? 'Stop logging' : 'Start logging';
@@ -549,6 +563,10 @@ function onHello(h) {
   }
   const sel = $('scene');
   sel.innerHTML = h.scenes.map((s) => `<option value="${s.id}">${s.name}</option>`).join('');
+  if (h.sensor_presets) {
+    $('preset').innerHTML = Object.entries(h.sensor_presets).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+    $('preset').value = h.sensor_preset;
+  }
   if (h.scene) {
     sel.value = h.scene.id;
     $('scene-desc').textContent = h.scene.description || '';
@@ -602,7 +620,8 @@ $('s-blocked').onchange = (e) => send({ t: 'sim', key: 'blocked', value: e.targe
 $('s-sun').oninput = (e) => { $('o-sun').textContent = e.target.value; send({ t: 'sim', key: 'sun', value: +e.target.value }); };
 $('s-reset').onclick = () => send({ t: 'sim', key: 'reset' });
 $('m-cal').onclick = () => send({ t: 'setting', key: 'calibrate_mount' });
-$('c-offpath').onchange = (e) => send({ t: 'setting', key: 'report_off_path', value: e.target.checked });
+document.querySelectorAll('#zone button').forEach((b) => (b.onclick = () => send({ t: 'setting', key: 'report_off_path', value: b.dataset.zone === 'fov' })));
+$('preset').onchange = () => { toast('Switching simulated sensor…'); send({ t: 'sim', key: 'sensor_preset', value: $('preset').value }); };
 $('c-mirror').onchange = (e) => send({ t: 'setting', key: 'flip_horizontal', value: e.target.checked });
 const sliderSetting = (id, key, simKey) => {
   const el = $(id);
@@ -695,6 +714,11 @@ addEventListener('resize', resize);
 resize();
 
 const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+function sensorVfov() {
+  if (!st) return 60;
+  return 2 * Math.atan2((st.intr.h * st.intr.stride) / 2, st.intr.fy) / DEG;
+}
+$('t-vfov').oninput = () => { $('o-vfov').textContent = `${$('t-vfov').value}°`; };
 function animate() {
   requestAnimationFrame(animate);
   worldGroup.visible = $('t-world').checked;
@@ -721,7 +745,7 @@ function animate() {
       camera.lookAt(tmpB);
     }
     if (view !== 'top') camera.up.set(0, 1, 0);
-    camera.fov = view === 'sensor' ? 62 : 55;
+    camera.fov = view === 'sensor' ? sensorVfov() : +$('t-vfov').value;
     camera.updateProjectionMatrix();
   }
   if (controls.enabled) controls.update();

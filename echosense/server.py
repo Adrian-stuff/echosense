@@ -132,9 +132,12 @@ class ConsoleServer:
         if t == "action":
             await loop.run_in_executor(None, es.action, m["action"], "console")
         elif t == "sim":
-            es.sim_command(m["key"], m.get("value"))
-            if m["key"] == "scene":
-                await c.ws.send_json(es.hello())
+            if m["key"] == "sensor_preset":
+                await loop.run_in_executor(None, es.sim_command, m["key"], m.get("value"))
+            else:
+                es.sim_command(m["key"], m.get("value"))
+            if m["key"] in ("scene", "sensor_preset"):
+                self._broadcast(es.hello())
         elif t == "setting":
             es.set_setting(m["key"], m.get("value"))
         elif t == "source":

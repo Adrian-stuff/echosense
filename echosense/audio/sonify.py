@@ -128,7 +128,7 @@ class Sonifier:
         dry = self.ping(cue["kind"])
         h = self.hrtf.hrir(cue["az"], cue.get("el", 0.0))
         wet = np.stack([np.convolve(dry, h[:, 0]), np.convolve(dry, h[:, 1])], 1)
-        return wet * self.gain(cue["r"], cue.get("rank", 0)) * 0.5
+        return wet * self.gain(cue.get("r_urgent", cue["r"]), cue.get("rank", 0)) * 0.5
 
     def __call__(self, engine: AudioEngine, start: int, n: int):
         with self._lock:
@@ -149,7 +149,7 @@ class Sonifier:
                 if self.on_ping:
                     self.on_ping(cue, engine.wall_time_of(v["next"]), v["first"])
                 v["first"] = False
-                v["next"] += int(self.interval(cue["r"], cue.get("rank", 0)) * self.sr)
+                v["next"] += int(self.interval(cue.get("r_urgent", cue["r"]), cue.get("rank", 0)) * self.sr)
         for key in list(self._voices):
             if key not in live:
                 del self._voices[key]

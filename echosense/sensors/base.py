@@ -60,5 +60,13 @@ class DepthSource:
         with self._lock:
             self._lock.notify_all()
 
+    def spec(self, cfg: dict) -> dict:
+        """What this sensor sees: intrinsics, depth range, model. Drives the viewer and coverage figures."""
+        s = cfg["sensor"]
+        out = {"model": self.kind, "label": self.label, "min_depth": s["min_depth"], "max_depth": s["max_depth"],
+               "fps": s["fps"]}
+        out.update(self.intrinsics)
+        return out
+
     def info(self) -> dict:
         return {"kind": self.kind, "label": self.label, "intrinsics": self.intrinsics, "error": self.error}

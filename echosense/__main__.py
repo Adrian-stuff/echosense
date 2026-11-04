@@ -37,6 +37,8 @@ def cmd_run(args):
     cfg = load_config(args.config, args.profile)
     if args.stride:
         cfg["processing"]["stride"] = args.stride
+    if args.sensor:
+        cfg.setdefault("sim", {})["sensor_preset"] = args.sensor
     app = EchoSense(cfg, source=args.source, scene=args.scene, audio=args.audio, record=args.record,
                     settings_path=args.settings, perf_csv=args.perf_csv)
     app.start()
@@ -101,6 +103,7 @@ def main(argv=None):
     r = sub.add_parser("run", help="run the device software and the web console")
     r.add_argument("--source", default="auto", help="auto | sim | kinect2 | kinect2-fake | kinect1 | replay:FILE.esd")
     r.add_argument("--scene", default="maysan_street", help="simulator scene id or path to a scene .json")
+    r.add_argument("--sensor", help="simulated sensor model: kinect_v2 (default), azure_nfov, azure_wfov, realsense_d455")
     r.add_argument("--audio", choices=["local", "none"], help="audio driver (default from profile)")
     r.add_argument("--host")
     r.add_argument("--port", type=int)
@@ -132,6 +135,12 @@ def main(argv=None):
     q.add_argument("--csv", help="sample CSV path (default reports/perf-<host>-<time>.csv)")
     q.add_argument("--out", default="reports")
     q.set_defaults(fn=lambda a: __import__("echosense.tools.perfcheck", fromlist=["run"]).run(a))
+
+    e = sub.add_parser("eval-sensing", help="hard-case depth sensing benchmark (thin poles, cables, sunlight, curbs ...)")
+    e.add_argument("--seeds", type=int, default=4)
+    e.add_argument("--frames", type=int, default=24)
+    e.add_argument("--preset", help="simulated sensor model (kinect_v2, azure_nfov, azure_wfov, realsense_d455)")
+    e.set_defaults(fn=lambda a: __import__("echosense.tools.sensing_eval", fromlist=["run"]).run(a))
 
     i = sub.add_parser("info", help="show sensors / audio / TTS available here")
     i.set_defaults(fn=cmd_info)

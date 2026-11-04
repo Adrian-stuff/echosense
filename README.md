@@ -115,6 +115,70 @@ What it can't reproduce:
 * **USB passthrough on macOS/Windows Docker Desktop.** On a Linux host add
   `-f docker/docker-compose.kinect-linux.yml` to pass a real Kinect in.
 
+## Depth sensing
+
+The processing stages from depth frame to obstacle (`echosense/processing/`):
+
+1. **Front-end** (`depthfilter.py`):
+   * removes mixed ("flying") pixels at object edges
+   * downsamples each block to its nearest surface, so a 5 cm pole at 4 m or a 3 cm cable isn't skipped
+   * holds flickering pixels for 2 frames, so sun or dark-surface dropouts don't make obstacles blink
+2. **Floor fit**: RANSAC that prefers the surface the user is standing on, so a street 15 cm below
+   the sidewalk doesn't win.
+3. **Obstacle clustering**: done separately inside and outside the walking corridor. Walls and curbs
+   running parallel to the path are suppressed. Drop-off distance is measured at the lip.
+4. **Distance estimate**: a per-column front-face estimate. Noise averages out instead of pulling
+   the distance toward the sensor, and any remaining bias is toward the user (the safe side).
+5. **Tracking**: an alpha-beta filter on range estimates closing speed and **time-to-contact**. A
+   person walking toward you is prioritised and pinged by how soon you'd meet, not just distance.
+6. **Sensing quality**: the share of floor-facing pixels that return depth. Below 75% for 1.5 s
+   (strong sun, dirty lens) the device says *"Depth sensing degraded. Take extra care."* Cues continue.
+
+`echosense eval-sensing` runs the hard cases (thin poles, cables, head-level sign, curb, step down,
+foliage and concrete in sun, dark fabric, glass, an approaching pedestrian). Results on the
+Orange Pi profile:
+
+| | Before | After |
+|---|---|---|
+| Mean distance error | 4.3 cm | 2.5 cm |
+| Frame-to-frame jitter (unsteady ping rate) | 0.5 cm | 0.1 cm |
+| Foliage in direct sun at 4 m | 16.3 cm (fails 15 cm) | 12.9 cm, reported nearer |
+| Thin 5 cm pole at 4 m | 4.7 cm | 0.7 cm |
+| Approaching pedestrian, reported vs true | 3.7 cm farther | 0.1 cm |
+
+The simulator's Kinect model was also made harsher for this, so the gains aren't tuned to an easy
+sensor:
+* sunlight blanks whole patches of the image, not scattered pixels
+* dark fabric and foliage lose returns with range
+
+## Field of view
+
+The Kinect v2's field of view (70° × 60°) is fixed by its optics. What the software offers:
+
+* **Detection zone** (Fitting card): *Walking corridor* (default, as in the proposal) or *Full field
+  of view*, which also cues obstacles to the sides, quieter and after the ones in the path.
+* **Coverage figures** (Fitting card): where the sensor is blind for the current sensor and mount.
+  With the Kinect v2 at 1.25 m and −10° tilt, the floor is visible from 1.48 m, head height (1.7 m)
+  from 1.23 m, and the full corridor width from 0.64 m. Closer than that, the cane has to cover it.
+* **Other sensors in the simulator** (Simulator card, or `echosense run --sensor NAME`), to decide
+  whether a wider sensor is worth it before buying:
+
+| Sensor | FOV | Range | Floor seen from | Head height seen from | Width at 2 m |
+|---|---|---|---|---|---|
+| Kinect v2 (`kinect_v2`) | 70 × 60° | 0.5–4.5 m | 1.48 m | 1.23 m | 2.8 m |
+| Azure Kinect / Orbbec Femto narrow (`azure_nfov`) | 75 × 65° | 0.5–3.9 m | 1.36 m | 1.09 m | 3.1 m |
+| Azure Kinect / Orbbec Femto wide (`azure_wfov`) | 120 × 120° | 0.25–2.9 m | 0.45 m | 0.38 m | 6.9 m |
+| RealSense D455 (`realsense_d455`) | 87 × 58° | 0.6–6 m | 1.54 m | 1.31 m | 3.8 m |
+
+(Figures are at 1.25 m mount height and −10° tilt.) The wide mode removes almost all close-range
+blind zones but only reaches 2.9 m, and it can't see into a 60 cm-deep drain until about 2 m. The
+pipeline picks a finer stride automatically for coarser sensors so thin cables are still caught.
+Only the Kinect v2 has a hardware driver here; the others are simulation models, with wide lenses
+treated as pinhole.
+
+* **Viewer FOV** slider (under the 3D view) widens the 3D camera. *Sensor view* always uses the
+  sensor's real FOV.
+
 ## Can the Orange Pi handle it? (performance monitor)
 
 The device software samples itself every second. The console's **Performance** card and the
@@ -169,6 +233,7 @@ the device, and only the board can measure it.
 echosense bench                 # per-stage timing + estimated obstacle-to-sound latency vs the 300 ms budget
 echosense protocol --quick      # lab protocol in simulation (concrete, indoor, 5 reps), a few seconds
 echosense protocol              # full: 8 distances x 9 azimuths x 5 materials x 3 lighting x 30 reps
+echosense eval-sensing          # hard-case depth benchmark (--preset azure_wfov etc. to compare sensors)
 echosense info                  # what this machine has: sources, audio device, TTS
 .venv/bin/pytest -q             # test-suite
 ```

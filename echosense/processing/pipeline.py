@@ -26,8 +26,48 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from ..sensors.base import DepthFrame
+from .depthfilter import DepthFrontEnd
 
 UP = np.array([0.0, 1.0, 0.0])
+
+
+def column_near_range(r: np.ndarray, cols: np.ndarray, q_col: float = 0.25, q_near: float = 0.10) -> float | None:
+    """Distance to an obstacle's nearest part, robust to depth noise.
+
+    Each image column looks along one bearing, so its points belong to the surface facing the
+    user at that bearing: take a low quantile per column (the front face), then a low quantile
+    across columns (the part of the obstacle nearest the user). A plain 5th percentile of all
+    points is pulled towards the sensor by noise (about 1.6 sigma: ~20 cm on foliage in sun at 4 m).
+    """
+    order = np.lexsort((r, cols))
+    cs, rs = cols[order], r[order]
+    starts = np.flatnonzero(np.r_[True, cs[1:] != cs[:-1]])
+    counts = np.diff(np.r_[starts, cs.size])
+    good = counts >= 3
+    if good.sum() < 1:
+        return None
+    q = np.sort(rs[starts[good] + ((counts[good] - 1) * q_col).astype(np.int64)])
+    return float(q[int(q_near * (q.size - 1))])
+
+
+def parallel_edge(x: np.ndarray, z: np.ndarray, body: float, min_span: float = 1.2, max_wobble: float = 0.3) -> bool:
+    """Is this drop-off region a curb beside the path? Its inner edge (the side facing the user)
+    must run along the direction of travel for ``min_span`` metres without reaching the body width."""
+    if z.max() - z.min() < min_span:
+        return False
+    right = np.median(x) > 0
+    bins = ((z - z.min()) / 0.2).astype(np.int32)
+    edges = []
+    for b in np.unique(bins):
+        xb = x[bins == b]
+        if xb.size >= 2:
+            edges.append(xb.min() if right else xb.max())
+    if len(edges) < 5:
+        return False
+    e = np.asarray(edges)
+    lo, hi = np.percentile(e, (10, 90))
+    clear = (lo > body) if right else (hi < -body)
+    return bool(hi - lo < max_wobble and clear)
 
 
 def label8(occ: np.ndarray) -> tuple[np.ndarray, int]:
@@ -120,12 +160,25 @@ class Track:
             h = min(max((self.h_min + self.h_max) / 2, 0.3), 1.9)
         return math.degrees(math.atan2(h - ear_height, max(self.r, 0.3)))
 
+    def ttc(self) -> float | None:
+        """Seconds until contact at the current closing speed (None when not closing)."""
+        if self.hits >= 5 and self.vel_r < -0.3:
+            return self.r / -self.vel_r
+        return None
+
+    def urgency_range(self, walk_speed: float = 1.0) -> float:
+        """Distance that sounds as urgent as this obstacle is: a person closing at 2.5 m/s from 3 m
+        is as urgent as a post 1.2 m ahead of someone walking at 1 m/s."""
+        t = self.ttc()
+        return self.r if t is None else min(self.r, max(0.3, t * walk_speed))
+
     def to_dict(self, ear_height: float = 1.6) -> dict:
         return {"id": self.id, "kind": self.kind, "r": round(self.r, 3), "az": round(self.az, 2),
                 "el": round(self.el(ear_height), 1), "x": round(self.x, 3), "z": round(self.z, 3),
                 "h_min": round(self.h_min, 2), "h_max": round(self.h_max, 2), "width": round(self.width, 2),
                 "in_path": self.in_path, "suppressed": self.suppressed, "confirmed": self.confirmed,
                 "vel_r": round(self.vel_r, 2), "first_seen": self.first_seen, "eligible_since": self.eligible_since,
+                "ttc": None if self.ttc() is None else round(self.ttc(), 2), "r_urgent": round(self.urgency_range(), 3),
                 "box": [round(self.x_min, 3), round(self.x_max, 3), round(self.z_min, 3), round(self.z_max, 3)]}
 
 
@@ -139,6 +192,7 @@ class ProcessResult:
     ground: dict
     timings: dict
     counts: dict = field(default_factory=dict)
+    quality: float = 1.0  # share of floor-facing pixels that returned depth (sunlight / dropout indicator)
 
 
 class DepthProcessor:
@@ -152,6 +206,7 @@ class DepthProcessor:
         self.plane_age = 0.0
         self.plane_ok = False
         self.rng = np.random.default_rng(7)
+        self.front = DepthFrontEnd(self.p)
         self.set_mount(cfg["sensor"]["mount_height"], cfg["sensor"]["mount_pitch_deg"])
 
     # ---------------------------------------------------------------- setup
@@ -160,20 +215,44 @@ class DepthProcessor:
         self.mount_pitch = float(pitch_deg)
         self.M = mount_matrix(self.mount_pitch)
         self.plane = None
+        self._intr_key = None  # floor-facing mask depends on the mount
 
     def reset(self):
         self.tracks = []
         self.plane = None
+        self.front.reset()
+
+    def effective_stride(self, fx: float) -> int:
+        """``stride`` is tuned for the Kinect v2 (0.14 deg per pixel). A wide-angle sensor spreads
+        fewer pixels over each degree, so it gets a finer stride to keep the same angular sampling
+        and still catch a 3 cm cable."""
+        ref = float(self.p.get("stride_reference_fx", 365.456))
+        return max(1, int(round(int(self.p["stride"]) * min(1.0, fx / ref))))
 
     def _prepare(self, intr: dict, shape):
-        key = (intr["fx"], intr["fy"], intr["cx"], intr["cy"], shape, self.p["stride"])
+        key = (intr["fx"], intr["fy"], intr["cx"], intr["cy"], shape, self.p["stride"], self.front.mode)
         if key == self._intr_key:
             return
-        s = int(self.p["stride"])
+        s = self.effective_stride(intr["fx"])
+        self.front.stride = s
+        self.stride_used = s
         H, W = shape
-        v, u = np.mgrid[0:H:s, 0:W:s].astype(np.float32)
+        h, w = H // s, W // s
+        off = 0.0 if self.front.mode == "stride" else (s - 1) / 2  # block centres
+        v, u = np.mgrid[0:h, 0:w].astype(np.float32)
+        u, v = u * s + off, v * s + off
         self.xs = ((u - intr["cx"]) / intr["fx"]).ravel()
         self.ys = ((v - intr["cy"]) / intr["fy"]).ravel()
+        self.cols = np.tile(np.arange(w, dtype=np.int32), h)
+        # pixels whose ray meets the floor between 0.8 and 3.5 m: with a healthy sensor nearly all of
+        # them return depth (floor or whatever stands on it), so their dropout rate measures sensing quality
+        M = self.M
+        ydir = M[1, 0] * self.xs + M[1, 1] * self.ys + M[1, 2]
+        zdir = M[2, 0] * self.xs + M[2, 1] * self.ys + M[2, 2]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            t = np.where(ydir < -1e-3, -self.mount_height / ydir, np.inf)
+        reach = t * zdir
+        self.floor_mask = (reach > 0.8) & (reach < 3.5) & (t < 4.3)
         self._intr_key = key
 
     # ---------------------------------------------------------------- frame
@@ -181,13 +260,18 @@ class DepthProcessor:
                 ear_height: float = 1.6) -> ProcessResult:
         t0 = time.perf_counter()
         p = self.p
-        s = int(p["stride"])
         depth = frame.depth
         self._prepare(frame.intrinsics, depth.shape)
-        z = depth[::s, ::s].ravel()
+        s = self.stride_used
+        H0, W0 = depth.shape
+        raw = depth[: H0 // s * s: s, : W0 // s * s: s]
+        valid_ratio = float((raw > 0).mean()) if raw.size else 0.0  # before any filling: honest for health
+        fm = self.floor_mask
+        quality = float((raw.ravel()[fm] > 0).mean()) if fm.any() else 1.0
+        z = self.front(depth).ravel()
         valid = z > 0
-        valid_ratio = float(valid.mean()) if z.size else 0.0
         zc = z[valid]
+        cols = self.cols[valid]
         xc, yc = self.xs[valid] * zc, self.ys[valid] * zc
         M = self.M
         X = M[0, 0] * xc + M[0, 1] * yc + M[0, 2] * zc
@@ -210,15 +294,33 @@ class DepthProcessor:
         corr = np.abs(X) <= p["corridor_half_width"]
         found = []
         for part, in_path in ((obst & corr, True), (obst & ~corr, False)):
-            found += self._clusters(X[part], Z[part], hgt[part], cell, gw, gd, drop=False, in_path=in_path)
+            found += self._clusters(X[part], Z[part], hgt[part], cell, gw, gd, drop=False, in_path=in_path,
+                                    cols=cols[part])
         # for drop-off points, where the ray crossed the ground plane is the hole's lip
         if drop.any():
             sh = self._sensor_height()
             f = sh / (sh - hgt[drop])
             xd, zd = X[drop] * f, Z[drop] * f
+            hd = hgt[drop]
+            # curbs / drainage edges running beside the path: found from *all* drop points on each
+            # side (so a far, fragmented stretch is still recognised), then left out of clustering
+            keep = np.ones(xd.size, bool)
+            body = p["body_half_width"]
+            for sign in (1.0, -1.0):
+                side = sign * xd > body
+                if side.sum() >= 20 and parallel_edge(xd[side], zd[side], body):
+                    inner = np.percentile(sign * xd[side], 10)
+                    band = side & (sign * xd >= inner - 0.15)
+                    keep &= ~band
+                    zb = zd[band]
+                    found.append(Obstacle("edge", float(np.hypot(sign * inner, zb.min())), math.degrees(math.atan2(sign * inner, max(zb.min(), 0.1))),
+                                          float(sign * inner), float(zb.min()), float(hd[band].min()), 0.0,
+                                          float(min(sign * inner, sign * (inner + 0.4))), float(max(sign * inner, sign * (inner + 0.4))),
+                                          float(zb.min()), float(zb.max()), int(band.sum()), False, True))
+            xd, zd, hd = xd[keep], zd[keep], hd[keep]
             corr = np.abs(xd) <= p["corridor_half_width"]
             for part, in_path in ((corr, True), (~corr, False)):
-                found += self._clusters(xd[part], zd[part], hgt[drop][part], cell, gw, gd, drop=True, in_path=in_path)
+                found += self._clusters(xd[part], zd[part], hd[part], cell, gw, gd, drop=True, in_path=in_path)
         t3 = time.perf_counter()
 
         self._track(found, frame.t_capture)
@@ -230,7 +332,7 @@ class DepthProcessor:
         ms = lambda a, b: round((b - a) * 1000, 2)  # noqa: E731
         return ProcessResult(
             seq=frame.seq, t_capture=frame.t_capture, tracks=list(self.tracks),
-            reported=[t.to_dict(ear_height) for t in reported], valid_ratio=valid_ratio,
+            reported=[t.to_dict(ear_height) for t in reported], valid_ratio=valid_ratio, quality=quality,
             ground=self.ground_info(),
             timings={"project": ms(t0, t1), "ground": ms(t1, t2), "cluster": ms(t2, t3), "track": ms(t3, t4),
                      "total": ms(t0, t4)},
@@ -319,7 +421,7 @@ class DepthProcessor:
                 "pitch": round(self.mount_pitch + pitch_err, 2), "plane": [round(float(v), 5) for v in self.plane]}
 
     # ------------------------------------------------------------- clusters
-    def _clusters(self, X, Z, Hh, cell, gw, gd, drop: bool, in_path: bool) -> list[Obstacle]:
+    def _clusters(self, X, Z, Hh, cell, gw, gd, drop: bool, in_path: bool, cols=None) -> list[Obstacle]:
         p = self.p
         if X.size < p["min_cluster_points"]:
             return []
@@ -348,8 +450,12 @@ class DepthProcessor:
             x, zz, h = X[sel], Z[sel], Hh[sel]
             r = np.hypot(x, zz)
             x_min, x_max = np.percentile(x, (2, 98))
-            kth = max(0, int(0.05 * r.size) - 1)
-            r_near = float(np.partition(r, kth)[kth])
+            r_near = None
+            if cols is not None and p.get("column_estimator", True):
+                r_near = column_near_range(r, cols[sel])
+            if r_near is None:
+                kth = max(0, int(0.05 * r.size) - 1)
+                r_near = float(np.partition(r, kth)[kth])
             near = r <= r_near + 0.15
             xn, zn = float(np.median(x[near])), float(np.median(zz[near]))
             z_min, z_max = np.percentile(zz, (2, 98))
@@ -367,8 +473,12 @@ class DepthProcessor:
             else:
                 kind = "body"
             suppressed = False
-            if not drop and (z_max - z_min) > 1.2 and (x_max - x_min) < 0.4 and not (x_min <= body and x_max >= -body):
-                kind, suppressed = "wall", True  # wall running parallel to the direction of travel
+            if drop and not suppressed and parallel_edge(x, zz, body):
+                kind, suppressed = "edge", True  # curb / drop-off edge running beside the path
+            elif (z_max - z_min) > 1.2 and (x_max - x_min) < 0.4 and not (x_min <= body and x_max >= -body):
+                # a wall, or a curb / drainage edge, running parallel to the direction of travel:
+                # it guides the user rather than blocking them, so it is not cued
+                kind, suppressed = ("edge" if drop else "wall"), True
             out.append(Obstacle(kind, r_near, math.degrees(math.atan2(xn, zn)), xn, zn, float(h_min), float(h_max),
                                 float(x_min), float(x_max), float(z_min), float(z_max), int(sel.size), in_path,
                                 suppressed))
@@ -381,7 +491,7 @@ class DepthProcessor:
         pairs = []
         for i, tr in enumerate(self.tracks):
             for j, ob in enumerate(found):
-                if (tr.kind == "drop") != (ob.kind == "drop"):
+                if (tr.kind in ("drop", "edge")) != (ob.kind in ("drop", "edge")):
                     continue
                 d = math.hypot(tr.x - ob.x, tr.z - ob.z)
                 if d < gate:
@@ -395,10 +505,14 @@ class DepthProcessor:
             used_o.add(j)
             tr, ob = self.tracks[i], found[j]
             dt = max(t - tr.last_seen, 1e-3)
-            new_r = (1 - alpha) * tr.r + alpha * ob.r
-            tr.vel_r = 0.7 * tr.vel_r + 0.3 * ((ob.r - tr.r) / dt)
-            # big jumps (object suddenly closer) are taken immediately: safety first
-            tr.r = ob.r if ob.r < tr.r - 0.3 else new_r
+            # alpha-beta filter on range: smooths noise without lagging behind something that moves
+            pred = tr.r + tr.vel_r * dt
+            res = ob.r - pred
+            if ob.r < pred - 0.3:
+                tr.r = ob.r  # suddenly much closer: take it at once, safety first
+            else:
+                tr.r = pred + alpha * res
+            tr.vel_r = float(np.clip(tr.vel_r + p["velocity_gain"] * res / dt, -5.0, 5.0))
             tr.az = (1 - alpha) * tr.az + alpha * ob.az
             tr.x, tr.z = ob.x, ob.z
             tr.h_min, tr.h_max = ob.h_min, ob.h_max
@@ -438,7 +552,7 @@ class DepthProcessor:
                 cands.append(tr)
 
         def key(tr: Track):
-            eff = tr.r - (bonus if tr.kind in ("head", "drop") else 0.0)
+            eff = tr.urgency_range() - (bonus if tr.kind in ("head", "drop") else 0.0)
             return (0 if tr.in_path else 1, eff)
 
         return sorted(cands, key=key)

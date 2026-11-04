@@ -312,3 +312,94 @@ def test_perf_monitor_samples_live_app(tmp_path, cfg):
     finally:
         app.stop()
     assert len(csv_path.read_text().splitlines()) >= 3
+
+
+# ------------------------------------------------------------- depth sensing
+def test_mixed_pixels_removed():
+    from echosense.processing.depthfilter import remove_mixed_pixels
+
+    d = np.full((4, 9), 3.0, np.float32)
+    d[:, :4] = 1.0
+    d[:, 4] = 2.0  # a pixel between the 1 m object and the 3 m background
+    out = remove_mixed_pixels(d)
+    assert (out[:, 4] == 0).all() and (out[:, :4] == 1.0).all() and (out[:, 5:] == 3.0).all()
+
+
+@pytest.mark.parametrize("profile", [None, "orangepi5"])
+def test_thin_pole_far_away(profile):
+    cfg = load_config(profile=profile)
+    pole = {"type": "cylinder", "name": "pole", "x": 0.05, "z": 0.12 + 4.0 + 0.025, "r": 0.025, "y1": 2.2, "material": "metal"}
+    _, _, res = run(cfg, scene(pole), frames=6)
+    hits = [o for o in res.reported if abs(o["r"] - 4.0) < 0.3]
+    assert hits and abs(hits[0]["r"] - 4.0) < 0.05
+
+
+def test_noisy_surface_in_sun_within_15cm():
+    """Foliage in direct sun at 4 m: the noisiest case. On the device profile the error stays within
+    the proposal's 15 cm, and any bias is towards the user (reported nearer), the safe side."""
+    cfg = load_config(profile="orangepi5")
+    errs = []
+    for seed in range(3):
+        _, _, res = run(cfg, lab_scene(4.0, 0, "foliage"), frames=8, seed=seed, sun=0.9)
+        hits = [o for o in res.reported if abs(o["az"]) < 10]
+        assert hits
+        errs.append(hits[0]["r"] - 4.0)
+    assert np.mean(np.abs(errs)) < 0.15 and max(errs) < 0.03
+
+
+def test_time_to_contact_for_approaching_person(cfg):
+    sc = scene({"type": "pedestrian", "name": "w", "path": [[0.0, 4.82], [0.0, 0.92]], "speed": 1.3})
+    sim = SimulatedKinect(cfg, sc, seed=3)
+    sim.head_bob = False
+    proc = DepthProcessor(cfg)
+    for f in range(45):
+        res = proc.process(DepthFrame(sim.capture(f / 30)[0], f / 30, f + 1, sim.intrinsics, "sim"), 4.5, True)
+    o = res.reported[0]
+    assert abs(o["vel_r"] + 1.3) < 0.15
+    assert o["ttc"] is not None and abs(o["ttc"] - o["r"] / 1.3) < 0.2
+    assert o["r_urgent"] < o["r"]  # closing faster than walking pace: sounds more urgent than its distance
+
+
+def test_parallel_curb_not_cued_but_hole_ahead_is(cfg):
+    curb = {"type": "pit", "name": "street", "x0": 0.7, "x1": 5.0, "z0": -1.0, "z1": 20.0, "depth": 0.15}
+    hole = {"type": "pit", "name": "drain", "x0": -0.6, "x1": 0.4, "z0": 2.12, "z1": 2.7, "depth": 0.5}
+    _, _, res = run(cfg, scene(curb), frames=6)
+    assert not [o for o in res.reported if o["kind"] == "drop"]
+    _, _, res = run(cfg, scene(curb, hole), frames=6)
+    drops = [o for o in res.reported if o["kind"] == "drop"]
+    assert drops and abs(drops[0]["r"] - 2.0) < 0.15
+
+
+def test_degraded_sensing_state(cfg):
+    h = HealthMonitor(cfg["health"])
+    for t in np.arange(0, 3, 0.1):
+        h.on_frame(t, 0.6, 0.4)
+        h.tick(t)
+    assert h.state == "degraded"
+    for t in np.arange(3, 6, 0.1):
+        h.on_frame(t, 0.6, 0.97)
+        h.tick(t)
+    assert h.state == "ok"
+
+
+def test_sunlight_lowers_sensing_quality(cfg):
+    q = {}
+    for sun in (0.0, 1.0):
+        _, _, res = run(cfg, "open_area", frames=3, sun=sun)
+        q[sun] = res.quality
+    assert q[0.0] > 0.95 and q[1.0] < cfg["health"]["degraded_quality"]
+
+
+def test_sensor_presets_and_coverage(cfg):
+    from echosense.sensors.presets import PRESETS, coverage
+
+    k = coverage(PRESETS["kinect_v2"], 1.25, -10)
+    w = coverage(PRESETS["azure_wfov"], 1.25, -10)
+    assert 69 < k["hfov"] < 72 and w["hfov"] == 120.0
+    assert w["floor_from"] < k["floor_from"] and w["head_from"] < k["head_from"]
+    cfg["sim"]["sensor_preset"] = "azure_wfov"
+    cfg["processing"]["stride"] = 4
+    sim, proc, res = run(cfg, lab_scene(2.0, 0, "concrete"))
+    assert sim.cam.width == 512 and sim.cam.height == 512
+    assert proc.stride_used == 2  # coarser pixels -> finer stride
+    assert any(abs(o["r"] - 2.0) < 0.1 for o in res.reported)

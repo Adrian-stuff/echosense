@@ -46,6 +46,11 @@ DEFAULTS: dict = {
     },
     "processing": {
         "stride": 3,  # pixel subsampling before 3D projection
+        "downsample": "near_median",  # near_median (keeps thin objects) | stride
+        "near_layer": 0.25,
+        "hold_frames": 2,  # keep a flickering pixel's last depth this many frames
+        "flying_pixel_filter": True,
+        "column_estimator": True,
         "ground_tolerance": 0.08,  # |height| below this is ground (m)
         "drop_threshold": 0.12,  # below the ground plane by this = drop-off
         "user_height": 1.75,
@@ -53,8 +58,8 @@ DEFAULTS: dict = {
         "corridor_half_width": 0.45,  # walking corridor, each side of centre
         "body_half_width": 0.25,
         "cell_size": 0.10,
-        "grid_half_width": 3.0,
-        "grid_depth": 5.0,
+        "grid_half_width": 4.0,
+        "grid_depth": 6.5,
         "min_cell_points": 3,
         "min_cluster_points": 6,
         "ransac_iterations": 48,
@@ -65,12 +70,14 @@ DEFAULTS: dict = {
         "drop_time": 0.35,  # forget a track unseen for this long (s)
         "assoc_gate": 0.6,
         "smoothing": 0.5,
+        "velocity_gain": 0.15,
         "overhang_min_height": 1.0,  # nothing below this = head-level hazard
         "low_max_height": 0.45,  # nothing above this = low / tripping hazard
         "priority_bonus": 0.25,  # head-level and drop-offs reported earlier
         "report_off_path": False,
     },
     "ranges": {"near": 1.5, "medium": 2.5, "far": 4.0},
+    "sim": {"sensor_preset": "kinect_v2"},  # see sensors/presets.py: compare wider-FOV sensors
     "audio": {
         "sample_rate": 48000,
         "block_size": 1024,
@@ -86,6 +93,8 @@ DEFAULTS: dict = {
         "no_data_timeout": 1.0,
         "blocked_valid_ratio": 0.10,
         "blocked_time": 1.0,
+        "degraded_quality": 0.75,  # below this share of floor returns, sensing is degraded
+        "degraded_time": 1.5,
         "alert_repeat": 8.0,
     },
     "battery": {"capacity_hours": 4.0, "low_warning": 20, "critical_warning": 10},
@@ -105,6 +114,7 @@ DEFAULTS: dict = {
         "sensor_ok": "Sensor OK.",
         "sensor_blocked": "Sensor blocked. Use your cane.",
         "sensor_no_data": "Sensor not responding. Use your cane.",
+        "sensor_degraded": "Depth sensing degraded. Take extra care.",
         "status": "{sensor}. Range {range}. {mode} mode. {battery} percent battery.",
         "training_on": "Training mode.",
         "training_off": "Training mode off.",

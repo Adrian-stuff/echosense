@@ -81,7 +81,7 @@ small { color: var(--muted); font-weight: 400; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
 .field { display: grid; grid-template-columns: 110px 1fr 54px; align-items: center; gap: 8px; margin: 6px 0; color: var(--muted); }
-.field select { grid-column: 2 / 4; }
+.field select, .field .seg { grid-column: 2 / 4; }
 .field output { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
 .checks { display: flex; flex-direction: column; gap: 4px; margin: 6px 0; }
@@ -128,3 +128,7 @@ kbd { font: 10px ui-monospace, monospace; color: var(--muted); border: 1px solid
 .checks-table .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
 .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.fail { background: var(--bad); } .dot.n\/a { background: #3a4656; }
 .checks-table .hint { color: #6d7c8f; font-size: 11px; }
+.coverage { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; margin: 6px 0; padding: 6px 8px; background: #121820; border-radius: 6px; }
+.coverage dt { color: var(--muted); }
+.coverage dd { margin: 0; font-variant-numeric: tabular-nums; }
+.coverage .gap { color: var(--warn); }

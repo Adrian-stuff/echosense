@@ -151,6 +151,11 @@ class Kinect2Source(DepthSource):
         super().stop()
         self._kill()
 
+    def spec(self, cfg: dict) -> dict:
+        d = super().spec(cfg)
+        d.update(model="kinect_v2", min_depth=0.5, max_depth=4.5)
+        return d
+
     def info(self):
         d = super().info()
         d.update(serial=self.hello.get("serial"), pipeline=self.hello.get("pipeline"), flip=self.flip, bridge=self.bridge)
