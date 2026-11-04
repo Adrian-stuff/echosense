@@ -44,6 +44,7 @@ class AudioEngine:
         self.peak_dbfs = -120.0
         self.limiting = False
         self.underruns = 0
+        self.render_load = 0.0  # fraction of real time spent rendering (audio-thread load)
 
     # ------------------------------------------------------------- timing
     def wall_time_of(self, sample: int) -> float:
@@ -67,6 +68,13 @@ class AudioEngine:
 
     # ------------------------------------------------------------ render
     def render(self, n: int) -> np.ndarray:
+        t_start = time.perf_counter()
+        out = self._render(n)
+        load = (time.perf_counter() - t_start) / (n / self.sr)
+        self.render_load += 0.1 * (load - self.render_load)
+        return out
+
+    def _render(self, n: int) -> np.ndarray:
         start = self.clock
         self._render_wall, self._render_clock = time.monotonic(), start
         for gen in list(self.generators):

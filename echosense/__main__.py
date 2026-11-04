@@ -38,7 +38,7 @@ def cmd_run(args):
     if args.stride:
         cfg["processing"]["stride"] = args.stride
     app = EchoSense(cfg, source=args.source, scene=args.scene, audio=args.audio, record=args.record,
-                    settings_path=args.settings)
+                    settings_path=args.settings, perf_csv=args.perf_csv)
     app.start()
     host = args.host or cfg["web"]["host"]
     port = args.port or cfg["web"]["port"]
@@ -107,6 +107,7 @@ def main(argv=None):
     r.add_argument("--settings", help="settings file (default ~/.echosense/settings.json)")
     r.add_argument("--record", help="record the depth stream to FILE.esd")
     r.add_argument("--stride", type=int, help="override processing stride")
+    r.add_argument("--perf-csv", help="write a performance sample every second to this CSV")
     r.add_argument("--no-web", action="store_true")
     r.add_argument("--no-browser", action="store_true")
     r.set_defaults(fn=cmd_run)
@@ -121,6 +122,16 @@ def main(argv=None):
     p.add_argument("--reps", type=int, default=None)
     p.add_argument("--out", default="reports")
     p.set_defaults(fn=lambda a: __import__("echosense.tools.protocol", fromlist=["run"]).run(a))
+
+    q = sub.add_parser("perf", help="run headless and check whether this computer keeps up (exit 0 ok / 1 marginal / 2 overloaded)")
+    q.add_argument("--source", default="auto", help="auto | sim | kinect2 | kinect1 | replay:FILE.esd")
+    q.add_argument("--scene", default="maysan_street")
+    q.add_argument("--minutes", type=float, default=1.0)
+    q.add_argument("--seconds", type=int, help="overrides --minutes")
+    q.add_argument("--audio", choices=["local", "none"], help="audio driver (default from profile)")
+    q.add_argument("--csv", help="sample CSV path (default reports/perf-<host>-<time>.csv)")
+    q.add_argument("--out", default="reports")
+    q.set_defaults(fn=lambda a: __import__("echosense.tools.perfcheck", fromlist=["run"]).run(a))
 
     i = sub.add_parser("info", help="show sensors / audio / TTS available here")
     i.set_defaults(fn=cmd_info)

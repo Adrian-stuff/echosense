@@ -20,6 +20,7 @@ from .audio.speech import Speech
 from .config import expand
 from .device.gpio import start_gpio
 from .device.monitors import Battery, HealthMonitor, SessionLogger
+from .device.perf import PerfMonitor
 from .device.settings import MODES, RANGES, SettingsStore
 from .device.training import Trainer
 from .processing.pipeline import DepthProcessor
@@ -33,7 +34,7 @@ def volume_gain(v: int) -> float:
 
 class EchoSense:
     def __init__(self, cfg: dict, source: str = "auto", scene: str = "maysan_street", audio: str | None = None,
-                 record: str | None = None, settings_path: str | None = None):
+                 record: str | None = None, settings_path: str | None = None, perf_csv: str | None = None):
         self.cfg = cfg
         self.scene = scene
         self.source_request = source
@@ -72,7 +73,11 @@ class EchoSense:
         self.m_age: deque = deque(maxlen=120)
         self.cues: list = []
         self.last_result = None
+        self.perf_processed = 0  # counters read by the performance monitor
+        self.perf_dropped = 0
+        self.perf_busy_s = 0.0
         self._apply_mount()
+        self.perf = PerfMonitor(self, csv_path=perf_csv)
 
     # ============================================================ lifecycle
     def start(self):
@@ -84,11 +89,13 @@ class EchoSense:
         if self.settings.s.logging:
             self._start_log()
         threading.Thread(target=self._loop, name="echosense-main", daemon=True).start()
+        self.perf.start()
         if self.settings.s.power:
             threading.Thread(target=self._self_test, name="self-test", daemon=True).start()
 
     def stop(self):
         self.running = False
+        self.perf.stop()
         if self.source:
             self.source.stop()
         if self.driver:
@@ -130,6 +137,17 @@ class EchoSense:
             self.logger.write("source", source=src.kind)
             return src.kind == name or name == "auto"
 
+    def helper_pids(self) -> dict:
+        """Child processes and what they stand for, so their CPU is counted in the right budget."""
+        src, out = self.source, {}
+        proc = getattr(src, "_proc", None)  # simulator render worker
+        if proc is not None and getattr(proc, "pid", None):
+            out[proc.pid] = "simulator"
+        bridge = getattr(src, "proc", None)  # echosense-kinect2 (libfreenect2)
+        if bridge is not None and getattr(bridge, "pid", None):
+            out[bridge.pid] = "driver"
+        return out
+
     @property
     def sim(self) -> SimulatedKinect | None:
         return self.source if isinstance(self.source, SimulatedKinect) else None
@@ -152,12 +170,17 @@ class EchoSense:
             frame = src.read(timeout=0.25, after_seq=last_seq) if src else None
             now = time.monotonic()
             if frame is not None:
+                if last_seq and frame.seq > last_seq + 1:
+                    self.perf_dropped += frame.seq - last_seq - 1  # sensor produced frames we never processed
                 last_seq = frame.seq
+                t0 = time.perf_counter()
                 try:
                     self._process(frame)
                 except Exception as e:  # keep the device alive; report loudly
                     self.event("error", f"processing error: {e!r}")
                     time.sleep(0.1)
+                self.perf_busy_s += time.perf_counter() - t0
+                self.perf_processed += 1
             else:
                 self.sonifier.set_cues([])
                 self.cues = []
@@ -452,4 +475,5 @@ class EchoSense:
                 "sources": available_sources(self.cfg), "source": getattr(self.source, "kind", None),
                 "scene": sim.world.to_dict() if sim else None, "scenes": list_scenes(),
                 "settings": self.settings.to_dict(), "profiles": list(PROFILES), "events": list(self.events)[-30:],
-                "sim": sim.info() if sim else None}
+                "sim": sim.info() if sim else None,
+                "perf": {"host": self.perf.host, "history": list(self.perf.history)[-120:]}}

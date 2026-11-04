@@ -115,6 +115,54 @@ What it can't reproduce:
 * **USB passthrough on macOS/Windows Docker Desktop.** On a Linux host add
   `-f docker/docker-compose.kinect-linux.yml` to pass a real Kinect in.
 
+## Can the Orange Pi handle it? (performance monitor)
+
+The device software samples itself every second. The console's **Performance** card and the
+`perf:` pill in the top bar show a verdict (*Can handle it* / *Marginal* / *Overloaded*), 3-minute
+trend lines, per-core CPU bars, and these checks:
+
+| Check | Pass |
+|---|---|
+| Frame rate | ≥ 15 fps (proposal's sensor requirement) |
+| Keeping up with the sensor | ≤ 5 % of frames dropped |
+| Processing time p95 | ≤ half a frame (17 ms at 30 fps) |
+| Obstacle-to-sound latency p95 | ≤ 300 ms |
+| Audio dropouts | none in the last 60 s |
+| Audio thread load | ≤ 40 % |
+| Device software CPU (Echo-Sense + Kinect driver) | ≤ 60 % of one core |
+| Busiest core / total CPU | ≤ 80 % / ≤ 70 % (graded only on the board with a real sensor) |
+| SoC temperature | ≤ 75 °C (RK3588 throttles near 85 °C) |
+| CPU clock throttling | none |
+| Free memory / device memory | ≥ 25 % / ≤ 400 MB |
+
+CPU is split by role: device software, the Kinect driver process (`echosense-kinect2`), and the
+simulator. The simulator's share is excluded from the verdict because it doesn't exist on the
+device. In simulator runs, the whole-machine CPU checks are shown for information only.
+
+On the board, run it headless over SSH:
+
+```bash
+echosense perf --source kinect2 --minutes 10     # the real answer: Kinect decoding + pipeline + audio
+echosense perf --source kinect2 --minutes 60     # endurance / thermal run inside the housing
+echosense perf --minutes 1                       # quick check with the simulator
+```
+
+It prints a line every 5 s, then the worst result per check and a verdict. It writes every sample
+to `reports/perf-<host>-<time>.csv` and exits with 0 (handles it), 1 (marginal) or 2 (overloaded).
+`echosense run --perf-csv FILE` records the same samples during normal use, and session logs
+include them when logging is on.
+
+Numbers so far:
+
+| Machine | Source | fps | Processing p95 | Latency p95 | Device CPU | Verdict |
+|---|---|---|---|---|---|---|
+| MacBook Air M1 (dev) | simulator | 28 | 9 ms | 112 ms | 14 % of a core | Can handle it |
+| Virtual Orange Pi (Docker, 4 CPU cap) | simulator | 22 | 8 ms | 141 ms | 13 % of a core | Can handle it |
+| Orange Pi 5 | Kinect v2 | not measured yet: run `echosense perf --source kinect2` | | | | |
+
+The missing piece is the Kinect v2 driver. libfreenect2's CPU depth decoder is the heaviest part of
+the device, and only the board can measure it.
+
 ## Development tools
 
 ```bash

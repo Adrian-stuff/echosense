@@ -263,3 +263,52 @@ def test_app_end_to_end(tmp_path, cfg):
         assert app.health.state == "blocked" and app.cues == []
     finally:
         app.stop()
+
+
+# ------------------------------------------------------------------ performance
+def _sample(**kw):
+    base = {"source": "kinect2", "fps": 30.0, "sensor_fps": 30, "dropped_pct": 0.0, "proc_p95": 8.0, "e2e_p95": 150.0,
+            "underruns_60s": 0, "audio_load": 2.0, "cpu_device": 20.0, "cpu_driver": 15.0, "cpu_max_core": 50.0,
+            "cpu_total": 30.0, "cpu_container": None, "temp_c": 55.0, "freq_mhz": 2200, "throttled": False,
+            "mem_avail_pct": 60.0, "rss_mb": 80.0}
+    base.update(kw)
+    return base
+
+
+def _status(checks, name):
+    return next(c["status"] for c in checks if c["name"] == name)
+
+
+def test_perf_checks(tmp_path, cfg):
+    from echosense.app import EchoSense
+
+    cfg["speech"]["engine"] = "none"
+    app = EchoSense(cfg, source="sim", audio="none", settings_path=str(tmp_path / "s.json"))
+    pm = app.perf
+    ok = pm.checks(_sample())
+    assert all(c["status"] in ("ok", "n/a") for c in ok)
+    bad = pm.checks(_sample(fps=8.0, dropped_pct=40.0, proc_p95=60.0, e2e_p95=420.0, temp_c=88.0, underruns_60s=3))
+    for name in ("Frame rate", "Keeping up with the sensor", "Processing time (p95)",
+                 "Obstacle-to-sound latency (p95)", "SoC temperature", "Audio dropouts (last 60 s)"):
+        assert _status(bad, name) == "fail", name
+    # a slow simulator that the device fully keeps up with is not the device's fault
+    assert _status(pm.checks(_sample(source="sim", fps=9.0, dropped_pct=0.0)), "Frame rate") == "n/a"
+    assert _status(pm.checks(_sample(cpu_device=70.0, cpu_driver=25.0)), "Device software CPU") == "fail"
+
+
+def test_perf_monitor_samples_live_app(tmp_path, cfg):
+    from echosense.app import EchoSense
+
+    cfg["speech"]["engine"] = "none"
+    csv_path = tmp_path / "perf.csv"
+    app = EchoSense(cfg, source="sim", scene="obstacle_course", audio="none", settings_path=str(tmp_path / "s.json"),
+                    perf_csv=str(csv_path))
+    app.start()
+    try:
+        time.sleep(3.3)
+        s = app.perf.latest
+        assert s and s["fps"] > 3 and s["verdict"] and len(s["checks"]) >= 10
+        assert s["cpu_simulator"] > 0  # simulator CPU is attributed to the simulator, not the device
+    finally:
+        app.stop()
+    assert len(csv_path.read_text().splitlines()) >= 3

@@ -22,6 +22,7 @@
     <span class="pill" id="p-proc" title="Processing time per frame">— ms</span>
     <span class="pill" id="p-e2e" title="Obstacle appears → first sound (incl. confirmation). Budget 300 ms">e2e —</span>
     <span class="pill" id="p-batt" title="Battery">—%</span>
+    <span class="pill" id="p-perf" title="Performance verdict: can this computer run Echo-Sense within the limits?">perf —</span>
     <button class="pill btn" id="listen" title="Play the device's audio output in this browser">🎧 Listen</button>
   </div>
 </header>
@@ -63,6 +64,20 @@
         <div><h3>Cue map</h3><canvas id="radar" width="220" height="212"></canvas></div>
       </div>
       <div class="meta" id="frame-meta"></div>
+    </div>
+
+    <div class="card" id="perf-card">
+      <h3>Performance <small id="perf-host"></small></h3>
+      <div class="verdict" id="perf-verdict">waiting for the first sample…</div>
+      <div class="sparks">
+        <figure><figcaption>Frame rate <b id="sv-fps"></b></figcaption><canvas id="sp-fps" width="160" height="44"></canvas></figure>
+        <figure><figcaption>Processing p95 <b id="sv-proc"></b></figcaption><canvas id="sp-proc" width="160" height="44"></canvas></figure>
+        <figure><figcaption>Device CPU <b id="sv-cpu"></b></figcaption><canvas id="sp-cpu" width="160" height="44"></canvas></figure>
+        <figure><figcaption id="sc-temp">Temperature <b id="sv-temp"></b></figcaption><canvas id="sp-temp" width="160" height="44"></canvas></figure>
+      </div>
+      <div class="cores" id="perf-cores" title="Per-core CPU"></div>
+      <div class="meta" id="perf-split"></div>
+      <table class="checks-table" id="perf-checks"></table>
     </div>
 
     <div class="card">

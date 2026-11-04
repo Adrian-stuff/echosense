@@ -45,6 +45,7 @@ class ConsoleServer:
         self.web.router.add_get("/", self.index)
         self.web.router.add_get("/ws", self.ws_handler)
         self.web.router.add_get("/api/state", self.api_state)
+        self.web.router.add_get("/api/perf", self.api_perf)
         self.web.router.add_static("/static/", WEB_DIR)
 
     # ------------------------------------------------------------ http
@@ -56,6 +57,10 @@ class ConsoleServer:
         return web.json_response({"source": getattr(es.source, "kind", None), "health": es.health.state,
                                   "settings": es.settings.to_dict(), "metrics": es.metrics(),
                                   "battery": es.battery.percent, "cues": [{k: c.get(k) for k in ("kind", "r", "az")} for c in es.cues]})
+
+    async def api_perf(self, _req):
+        p = self.es.perf
+        return web.json_response({"host": p.host, "latest": p.latest, "summary": p.summary()})
 
     # ------------------------------------------------------- app hooks
     def _on_frame(self, packet: dict):  # processing thread
@@ -155,6 +160,7 @@ class ConsoleServer:
         self.loop = asyncio.get_running_loop()
         self.es.frame_listeners.append(self._on_frame)
         self.es.event_listeners.append(self._on_event)
+        self.es.perf.listeners.append(lambda sample: self.loop.call_soon_threadsafe(self._broadcast, {"type": "perf", **sample}))
         runner = web.AppRunner(self.web, access_log=None)
         await runner.setup()
         site = web.TCPSite(runner, self.host, self.port)

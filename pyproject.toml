@@ -7,7 +7,7 @@ name = "echosense"
 version = "0.1.0"
 description = "Echo-Sense: depth sensor (Kinect v2) to 3D spatial audio assistive device - device software, simulator and dev console"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.24", "aiohttp>=3.9", "sounddevice>=0.4.6"]
+dependencies = ["numpy>=1.24", "aiohttp>=3.9", "sounddevice>=0.4.6", "psutil>=5.9"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]

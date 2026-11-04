@@ -46,6 +46,65 @@ function onBinary(buf) {
 function onJson(m) {
   if (m.type === 'hello') onHello(m);
   else if (m.type === 'event') addEvent(m);
+  else if (m.type === 'perf') onPerf(m);
+}
+
+// ------------------------------------------------------------ performance
+const perfHist = [];
+const VERDICT_SHORT = { ok: 'handles it', warn: 'marginal', fail: 'overloaded' };
+function onPerf(p, redraw = true) {
+  perfHist.push(p);
+  while (perfHist.length > 180) perfHist.shift();
+  if (redraw) drawPerf();
+}
+function spark(id, key, { max = null, limit = null, fmt = (v) => v } = {}) {
+  const cv = $(id), g = cv.getContext('2d'), Wd = cv.width, Hd = cv.height;
+  g.clearRect(0, 0, Wd, Hd);
+  const vals = perfHist.map((p) => (typeof key === 'function' ? key(p) : p[key]));
+  const nums = vals.filter((v) => typeof v === 'number');
+  if (!nums.length) return '—';
+  const top = Math.max(max ?? 0, limit ? limit * 1.25 : 0, ...nums) || 1;
+  const y = (v) => Hd - 3 - (v / top) * (Hd - 6);
+  if (limit != null) {
+    g.strokeStyle = 'rgba(255,84,104,0.6)'; g.setLineDash([3, 3]);
+    g.beginPath(); g.moveTo(0, y(limit)); g.lineTo(Wd, y(limit)); g.stroke(); g.setLineDash([]);
+  }
+  g.strokeStyle = '#3dd6c4'; g.lineWidth = 1.5; g.beginPath();
+  const n = 180;
+  vals.forEach((v, i) => { if (typeof v !== 'number') return; const x = Wd - (vals.length - 1 - i) * (Wd / (n - 1)); i && typeof vals[i - 1] === 'number' ? g.lineTo(x, y(v)) : g.moveTo(x, y(v)); });
+  g.stroke();
+  return fmt(nums[nums.length - 1]);
+}
+function drawPerf() {
+  const p = perfHist[perfHist.length - 1];
+  if (!p) return;
+  const v = $('perf-verdict');
+  const fails = p.checks.filter((c) => c.status === 'fail').map((c) => c.name);
+  const warns = p.checks.filter((c) => c.status === 'warn').map((c) => c.name);
+  const worst = perfHist.slice(-60).some((x) => x.status === 'fail') ? 'fail' : perfHist.slice(-60).some((x) => x.status === 'warn') ? 'warn' : 'ok';
+  v.className = 'verdict ' + p.status;
+  v.innerHTML = `${p.verdict}<small>${fails.length ? 'Failing: ' + fails.join(', ') : warns.length ? 'Watch: ' + warns.join(', ') : 'All checks within limits'}` +
+    `${worst !== p.status ? ` · worst in the last minute: ${VERDICT_SHORT[worst]}` : ''}</small>`;
+  pill('p-perf', `perf: ${VERDICT_SHORT[p.status]}`, p.status === 'ok' ? 'ok' : p.status === 'warn' ? 'warn' : 'bad');
+  const period = 1000 / p.sensor_fps;
+  $('sv-fps').textContent = spark('sp-fps', 'fps', { max: p.sensor_fps, limit: null, fmt: (x) => `${x.toFixed(0)} fps` });
+  $('sv-proc').textContent = spark('sp-proc', 'proc_p95', { limit: period / 2, fmt: (x) => `${x.toFixed(1)} ms` });
+  $('sv-cpu').textContent = spark('sp-cpu', (q) => (q.cpu_device || 0) + (q.cpu_driver || 0), { max: 100, limit: 60, fmt: (x) => `${x.toFixed(0)} %` });
+  if (perfHist.some((q) => q.temp_c != null)) {
+    $('sc-temp').firstChild.textContent = 'SoC temperature ';
+    $('sv-temp').textContent = spark('sp-temp', 'temp_c', { max: 60, limit: 75, fmt: (x) => `${x.toFixed(0)} °C` });
+  } else {
+    $('sc-temp').firstChild.textContent = 'Latency p95 ';
+    $('sv-temp').textContent = spark('sp-temp', 'e2e_p95', { limit: 300, fmt: (x) => `${x.toFixed(0)} ms` });
+  }
+  $('perf-cores').innerHTML = (p.cpu_cores || []).map((c) => `<i style="height:${Math.max(4, c)}%" title="${c}%"></i>`).join('');
+  $('perf-split').textContent = `CPU (% of one core): device ${p.cpu_device ?? '—'}` +
+    (p.source === 'kinect2' ? ` · Kinect driver ${p.cpu_driver}` : '') +
+    (p.cpu_simulator ? ` · simulator ${p.cpu_simulator} (not on the device)` : '') +
+    ` · loop ${p.loop_load}% busy · audio ${p.audio_load}% · ${p.rss_mb} MB` +
+    (p.freq_mhz ? ` · ${p.freq_mhz} MHz` : '') + (p.cpu_container != null ? ` · container ${p.cpu_container}% of quota` : '');
+  const fmtV = (c) => (c.value == null ? '—' : `${c.value}${c.unit && !c.unit.startsWith('%') ? ' ' : ''}${c.unit}`);
+  $('perf-checks').innerHTML = p.checks.map((c) => `<tr><td><span class="dot ${c.status}"></span></td><td>${c.name}${c.hint ? `<div class="hint">${c.hint}</div>` : ''}</td><td>${fmtV(c)}</td><td>${c.target}</td></tr>`).join('');
 }
 
 // ------------------------------------------------------------------- three
@@ -502,6 +561,13 @@ function onHello(h) {
   }
   buildWorld(h.scene);
   grid.visible = true;
+  if (h.perf) {
+    const host = h.perf.host;
+    $('perf-host').textContent = `${host.model} · ${host.cores} cores${host.quota ? ` (quota ${host.quota})` : ''} · ${host.hostname}`;
+    perfHist.length = 0;
+    for (const p of h.perf.history) onPerf(p, false);
+    drawPerf();
+  }
   for (const ev of h.events || []) addEvent(ev, true);
 }
 
