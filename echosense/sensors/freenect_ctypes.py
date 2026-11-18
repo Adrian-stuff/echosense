@@ -1,0 +1,134 @@
+"""Minimal ctypes binding to libfreenect (Kinect v1 / Xbox 360), depth camera only.
+
+Why not libfreenect's own Python wrapper or its "sync" API?
+* the Cython wrapper has to be compiled against each Python version, and
+* ``freenect_sync`` also opens the tilt motor. On Kinect model 1473 the motor sits behind the
+  audio chip and needs a Microsoft firmware file (``audios.bin``) uploaded first. Without it,
+  opening fails even though the depth camera works.
+
+Opening only the camera subdevice avoids both. Needs nothing but the libfreenect shared
+library (Homebrew ``libfreenect``, Debian ``libfreenect0.5``).
+"""
+from __future__ import annotations
+
+import ctypes
+import ctypes.util
+import os
+import threading
+from pathlib import Path
+
+import numpy as np
+
+DEVICE_MOTOR, DEVICE_CAMERA, DEVICE_AUDIO = 1, 2, 4
+RES_MEDIUM = 1
+DEPTH_MM = 5  # FREENECT_DEPTH_MM: 640x480 uint16 millimetres, 0 = no reading
+
+
+class FrameMode(ctypes.Structure):
+    _fields_ = [("reserved", ctypes.c_uint32), ("resolution", ctypes.c_int), ("format", ctypes.c_int32),
+                ("bytes", ctypes.c_int32), ("width", ctypes.c_int16), ("height", ctypes.c_int16),
+                ("data_bits_per_pixel", ctypes.c_int8), ("padding_bits_per_pixel", ctypes.c_int8),
+                ("framerate", ctypes.c_int8), ("is_valid", ctypes.c_int8)]
+
+
+DEPTH_CB = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32)
+
+
+def find_library() -> str | None:
+    cands = [os.environ.get("ECHOSENSE_LIBFREENECT", ""), ctypes.util.find_library("freenect") or "",
+             "/opt/homebrew/lib/libfreenect.dylib", "/usr/local/lib/libfreenect.dylib",
+             "/usr/lib/aarch64-linux-gnu/libfreenect.so.0.5", "/usr/lib/arm-linux-gnueabihf/libfreenect.so.0.5",
+             "/usr/lib/x86_64-linux-gnu/libfreenect.so.0.5", "/usr/local/lib/libfreenect.so"]
+    for c in cands:
+        if c and (Path(c).exists() or "/" not in c):
+            try:
+                ctypes.CDLL(c)
+                return c
+            except OSError:
+                continue
+    return None
+
+
+class FreenectDepth:
+    """Streams Kinect v1 depth (mm) to ``on_frame(np.ndarray[480, 640] uint16, timestamp)``."""
+
+    def __init__(self, on_frame, index: int = 0, libpath: str | None = None):
+        path = libpath or find_library()
+        if not path:
+            raise OSError("libfreenect not found (macOS: brew install libfreenect; Debian: apt install libfreenect0.5)")
+        self.lib = lib = ctypes.CDLL(path)
+        lib.freenect_init.argtypes = [ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p]
+        lib.freenect_select_subdevices.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        lib.freenect_select_subdevices.restype = None
+        lib.freenect_num_devices.argtypes = [ctypes.c_void_p]
+        lib.freenect_open_device.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p), ctypes.c_int]
+        lib.freenect_find_depth_mode.argtypes = [ctypes.c_int, ctypes.c_int]
+        lib.freenect_find_depth_mode.restype = FrameMode
+        lib.freenect_set_depth_mode.argtypes = [ctypes.c_void_p, FrameMode]
+        lib.freenect_set_depth_callback.argtypes = [ctypes.c_void_p, DEPTH_CB]
+        lib.freenect_set_depth_callback.restype = None
+        for fn in ("freenect_start_depth", "freenect_stop_depth", "freenect_close_device"):
+            getattr(lib, fn).argtypes = [ctypes.c_void_p]
+        lib.freenect_process_events.argtypes = [ctypes.c_void_p]
+        lib.freenect_shutdown.argtypes = [ctypes.c_void_p]
+        lib.freenect_set_log_level.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        lib.freenect_set_log_level.restype = None
+        self.on_frame = on_frame
+        self.index = index
+        self.ctx = ctypes.c_void_p()
+        self.dev = ctypes.c_void_p()
+        self._cb = DEPTH_CB(self._depth_cb)  # keep a reference: ctypes callbacks must outlive their use
+        self._run = False
+        self._thread = None
+        self.mode = None
+
+    def open(self):
+        lib = self.lib
+        if lib.freenect_init(ctypes.byref(self.ctx), None) < 0:
+            raise OSError("freenect_init failed")
+        lib.freenect_set_log_level(self.ctx, 1)  # errors only
+        lib.freenect_select_subdevices(self.ctx, DEVICE_CAMERA)
+        n = lib.freenect_num_devices(self.ctx)
+        if n <= self.index:
+            lib.freenect_shutdown(self.ctx)
+            raise OSError("No Kinect v1 found (check USB and the 12 V power adapter)")
+        if lib.freenect_open_device(self.ctx, ctypes.byref(self.dev), self.index) < 0:
+            lib.freenect_shutdown(self.ctx)
+            raise OSError("Kinect v1 found but could not be opened (is another program using it?)")
+        self.mode = lib.freenect_find_depth_mode(RES_MEDIUM, DEPTH_MM)
+        if not self.mode.is_valid or lib.freenect_set_depth_mode(self.dev, self.mode) < 0:
+            self.close()
+            raise OSError("Kinect v1 does not accept the millimetre depth mode")
+        lib.freenect_set_depth_callback(self.dev, self._cb)
+        if lib.freenect_start_depth(self.dev) < 0:
+            self.close()
+            raise OSError("Kinect v1 depth stream did not start")
+        self._run = True
+        self._thread = threading.Thread(target=self._events, name="freenect-events", daemon=True)
+        self._thread.start()
+
+    def _depth_cb(self, _dev, buf, timestamp):
+        w, h = self.mode.width, self.mode.height
+        arr = np.ctypeslib.as_array(ctypes.cast(buf, ctypes.POINTER(ctypes.c_uint16)), shape=(h, w)).copy()
+        self.on_frame(arr, timestamp)
+
+    def _events(self):
+        while self._run:
+            if self.lib.freenect_process_events(self.ctx) < 0:
+                self._run = False
+                self.on_frame(None, 0)  # tell the owner the device went away
+                break
+
+    def close(self):
+        was = self._run
+        self._run = False
+        if self.dev:
+            if was:
+                self.lib.freenect_stop_depth(self.dev)
+            if self._thread and self._thread is not threading.current_thread():
+                self._thread.join(timeout=2)
+            self.lib.freenect_close_device(self.dev)
+            self.dev = ctypes.c_void_p()
+        if self.ctx:
+            self.lib.freenect_shutdown(self.ctx)
+            self.ctx = ctypes.c_void_p()

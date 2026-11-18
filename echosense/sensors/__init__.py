@@ -15,12 +15,10 @@ def available_sources(cfg: dict) -> list[dict]:
     bridge = find_bridge(cfg["sensor"].get("kinect2_bridge", ""))
     out.append({"id": "kinect2", "label": "Kinect v2", "available": bool(bridge),
                 "note": "" if bridge else "bridge not built"})
-    try:
-        import freenect  # noqa: F401  type: ignore
-        k1 = True
-    except ImportError:
-        k1 = False
-    out.append({"id": "kinect1", "label": "Kinect v1", "available": k1, "note": "" if k1 else "freenect not installed"})
+    from .kinect1 import kinect1_available
+
+    k1, note = kinect1_available()
+    out.append({"id": "kinect1", "label": "Kinect v1", "available": k1, "note": note})
     return out
 
 

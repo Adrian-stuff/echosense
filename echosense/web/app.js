@@ -485,7 +485,8 @@ function updatePanels(s) {
     ].map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('') +
       `<dt></dt><dd class="meta">Closer than these distances the sensor is blind at that height.</dd>`;
   }
-  $('mirror-wrap').hidden = s.source !== 'kinect2';
+  $('mirror-wrap').hidden = !['kinect2', 'kinect1'].includes(s.source);
+  if (s.flip != null && document.activeElement !== $('c-mirror')) $('c-mirror').checked = s.flip;
   $('c-announce').checked = !!set.announce;
   $('ground-est').textContent = s.ground.ok ? `floor says ${s.ground.height.toFixed(2)} m, ${s.ground.pitch.toFixed(1)}°` : 'floor not visible';
   $('b-log').textContent = s.logging ? 'Stop logging' : 'Start logging';

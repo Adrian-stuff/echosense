@@ -335,6 +335,7 @@ class EchoSense:
             "type": "frame", "seq": frame.seq, "source": frame.source, "source_label": getattr(src, "label", ""),
             "timings": res.timings, "valid_ratio": round(res.valid_ratio, 3), "ground": res.ground,
             "quality": round(self.health.quality, 3), "coverage": self.coverage(),
+            "flip": getattr(src, "flip", None),
             "mount": {"height": self.processor.mount_height, "pitch": self.processor.mount_pitch},
             "intr": intr, "tracks": [t.to_dict(self.cfg["audio"]["ear_height"]) for t in res.tracks],
             "reported": [o["id"] for o in res.reported], "cues": [{k: c.get(k) for k in ("id", "kind", "r", "az", "el", "rank", "ttc", "r_urgent", "label", "label_conf")} for c in cues],
@@ -460,18 +461,21 @@ class EchoSense:
             self.settings.update(**{key: None if value is None else float(value)})
             self._apply_mount()
         elif key == "calibrate_mount":
-            g = self.processor.ground_info()
-            if g["ok"]:
+            g = self.processor.calibrate_floor()
+            if g:
                 self.settings.update(mount_height=g["height"], mount_pitch=g["pitch"])
                 self._apply_mount()
+                self.processor.reset()
                 self.event("info", f"Mount calibrated from the floor: {g['height']:.2f} m, {g['pitch']:.1f} deg")
             else:
                 self.event("warning", "Calibration needs a clear view of the floor")
         elif key == "flip_horizontal" and hasattr(self.source, "flip"):
-            self.source.flip = bool(value)
-            intr = self.source.intrinsics
-            intr["cx"] = intr["width"] - 1 - intr["cx"]
-            self.cfg["sensor"]["flip_horizontal"] = bool(value)
+            if bool(value) != self.source.flip:
+                self.source.flip = bool(value)
+                intr = self.source.intrinsics
+                intr["cx"] = intr["width"] - 1 - intr["cx"]
+            self.cfg["sensor"]["kinect1_flip" if self.source.kind == "kinect1" else "flip_horizontal"] = bool(value)
+            self.processor.reset()
         elif key == "battery":
             self.battery.set(float(value))
         elif key == "charging":

@@ -3,7 +3,7 @@
   "sensor": {"model": "kinect_v1", "width": 640, "height": 480, "fx": 585.0, "fy": 585.0, "cx": 319.5, "cy": 239.5,
              "min_depth": 0.8, "max_depth": 4.0, "fps": 15},
   "sim": {"sensor_preset": "kinect_v1"},
-  "processing": {"stride": 8, "prestride": 2, "confirm_frames": 2, "ransac_iterations": 24, "hold_frames": 1},
+  "processing": {"stride": 5, "prestride": 2, "confirm_frames": 2, "ransac_iterations": 24, "hold_frames": 1},
   "audio": {"driver": "local", "sample_rate": 24000, "block_size": 512},
   "web": {"host": "0.0.0.0", "viewer_fps": 4, "viewer_stride": 4},
   "paths": {"settings": "~/.echosense/settings.json", "logs": "~/echosense-logs"}

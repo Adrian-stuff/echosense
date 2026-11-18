@@ -255,11 +255,12 @@ class DepthProcessor:
         self.front.reset()
 
     def effective_stride(self, fx: float) -> int:
-        """``stride`` is tuned for the Kinect v2 (0.14 deg per pixel). A wide-angle sensor spreads
-        fewer pixels over each degree, so it gets a finer stride to keep the same angular sampling
-        and still catch a 3 cm cable."""
+        """``stride`` is tuned for the Kinect v2 (0.16 deg per pixel). Other sensors get the stride
+        that gives the same angular sampling: finer for a wide-angle sensor (so a 3 cm cable is
+        still caught), coarser for the Kinect v1's smaller pixels (so it isn't processing 2.6x
+        more points than it needs)."""
         ref = float(self.p.get("stride_reference_fx", 365.456))
-        return max(1, int(round(int(self.p["stride"]) * min(1.0, fx / ref))))
+        return max(1, int(round(int(self.p["stride"]) * fx / ref)))
 
     def _prepare(self, intr: dict, shape):
         key = (intr["fx"], intr["fy"], intr["cx"], intr["cy"], shape, self.p["stride"], self.front.mode)
@@ -317,6 +318,7 @@ class DepthProcessor:
         Z = M[2, 0] * xc + M[2, 1] * yc + M[2, 2] * zc
         t1 = time.perf_counter()
 
+        self._last_pts = (X, Y, Z)
         hgt = self._ground(X, Y, Z, frame.t_capture)
         t2 = time.perf_counter()
 
@@ -455,6 +457,50 @@ class DepthProcessor:
         if nrm[1] < math.cos(math.radians(20)):
             return None
         return np.array([*nrm, -float(nrm @ c)])
+
+    def calibrate_floor(self) -> dict | None:
+        """Find the floor anywhere in view (no assumption about mount height or tilt) and return the
+        sensor height and tilt it implies, or None. Used by "Calibrate from floor": the device may sit
+        on a desk, a tripod or a chest strap. Of the large level surfaces, the lowest is the floor
+        (a table top is level too, but higher)."""
+        pts = getattr(self, "_last_pts", None)
+        if pts is None:
+            return None
+        X, Y, Z = pts
+        m = (Z > 0.3) & (Z < 4.5) & (Y < self.mount_height + 0.2)
+        P = np.stack([X[m], Y[m], Z[m]], 1).astype(np.float64)
+        if P.shape[0] < 300:
+            return None
+        rng = np.random.default_rng(1)
+        sub = P[rng.choice(P.shape[0], min(P.shape[0], 3000), replace=False)]
+        tri = sub[rng.integers(0, sub.shape[0], (600, 3))]
+        nrm = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+        ln = np.linalg.norm(nrm, axis=1)
+        ok = ln > 1e-9
+        nrm, tri = nrm[ok] / ln[ok, None], tri[ok]
+        nrm *= np.sign(nrm[:, 1:2] + 1e-12)
+        up = nrm[:, 1] > np.cos(np.radians(35))  # tolerate a badly guessed tilt
+        nrm, tri = nrm[up], tri[up]
+        if not len(nrm):
+            return None
+        ds = -(nrm * tri[:, 0]).sum(1)
+        counts = (np.abs(sub @ nrm.T + ds) < 0.03).sum(0)
+        heights = nrm[:, 1] * self.mount_height + ds  # sensor height above each candidate plane
+        sane = (heights > 0.2) & (heights < 2.5)
+        if not sane.any():
+            return None
+        top = int(np.argmax(np.where(sane, counts, -1)))  # the dominant level surface sets "up"
+        parallel = (nrm @ nrm[top]) > np.cos(np.radians(6))
+        big = sane & parallel & (counts >= max(150, 0.3 * counts[top]))
+        best = int(np.argmax(np.where(big, heights, -1)))  # of those parallel surfaces, the lowest is the floor
+        inl = P[np.abs(P @ nrm[best] + ds[best]) < 0.03]
+        c = inl.mean(0)
+        _, _, vt = np.linalg.svd(inl - c, full_matrices=False)
+        n = vt[2] * (1 if vt[2][1] > 0 else -1)
+        d = -float(n @ c)
+        height = float(n[1] * self.mount_height + d)
+        pitch = self.mount_pitch + float(np.degrees(np.arctan2(n[2], n[1])))
+        return {"height": round(height, 3), "pitch": round(pitch, 2), "inliers": int(inl.shape[0])}
 
     def ground_info(self) -> dict:
         if self.plane is None:

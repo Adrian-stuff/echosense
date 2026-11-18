@@ -4,15 +4,45 @@
     {
       "name": "echosense-sim",
       "runtimeExecutable": ".venv/bin/echosense",
-      "runtimeArgs": ["run", "--source", "sim", "--no-browser", "--port", "8080"],
+      "runtimeArgs": [
+        "run",
+        "--source",
+        "sim",
+        "--no-browser",
+        "--port",
+        "8080"
+      ],
       "port": 8080
     },
     {
       "name": "echosense-sim-silent",
       "runtimeExecutable": ".venv/bin/echosense",
-      "runtimeArgs": ["run", "--source", "sim", "--no-browser", "--audio", "none", "--port", "8081",
-                      "--settings", ".claude/test-settings.json"],
+      "runtimeArgs": [
+        "run",
+        "--source",
+        "sim",
+        "--no-browser",
+        "--audio",
+        "none",
+        "--port",
+        "8081",
+        "--settings",
+        ".claude/test-settings.json"
+      ],
       "port": 8081
+    },
+    {
+      "name": "echosense-kinect1",
+      "runtimeExecutable": ".venv/bin/echosense",
+      "runtimeArgs": [
+        "run",
+        "--source",
+        "kinect1",
+        "--no-browser",
+        "--port",
+        "8080"
+      ],
+      "port": 8080
     }
   ]
 }
