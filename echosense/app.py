@@ -616,7 +616,8 @@ class EchoSense:
     def sim_command(self, key: str, value):
         sim = self.sim
         if not sim:
-            self.event("warning", "Simulator controls need the simulator source")
+            if key != "move":  # walking keys mean nothing for a real sensor: ignore them quietly
+                self.event("warning", "Simulator controls need the simulator source")
             return
         if key == "scene":
             self.scene = value

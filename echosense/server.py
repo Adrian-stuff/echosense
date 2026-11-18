@@ -44,7 +44,7 @@ class ConsoleServer:
         self.loop: asyncio.AbstractEventLoop | None = None
         self._frame_bytes: bytes | None = None
         self._rgb_bytes: bytes | None = None
-        self.web = web.Application()
+        self.web = web.Application(middlewares=[self._revalidate])
         self.web.router.add_get("/", self.index)
         self.web.router.add_get("/ws", self.ws_handler)
         self.web.router.add_get("/api/state", self.api_state)
@@ -53,7 +53,20 @@ class ConsoleServer:
 
     # ------------------------------------------------------------ http
     async def index(self, _req):
-        return web.FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+        # version-stamp the console's own files so a browser never runs a stale app.js against a
+        # newer page (that is what broke "Show camera" after an update)
+        html = (WEB_DIR / "index.html").read_text()
+        for name in ("app.js", "style.css"):
+            v = int((WEB_DIR / name).stat().st_mtime)
+            html = html.replace(f"/static/{name}", f"/static/{name}?v={v}")
+        return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
+
+    @web.middleware
+    async def _revalidate(self, request, handler):
+        resp = await handler(request)
+        if request.path.startswith("/static/"):
+            resp.headers["Cache-Control"] = "no-cache"  # always check; unchanged files cost a 304
+        return resp
 
     async def api_state(self, _req):
         es = self.es
