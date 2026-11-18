@@ -22,6 +22,7 @@ class UserSettings:
     profile: str = "tone"  # tone | click | soft
     report_off_path: bool = False
     logging: bool = False  # session logging is for the evaluation period only
+    near_mode: bool = False  # hardware near mode where the sensor has it, plus close-range memory
     announce: bool = False  # say "Person ahead" / "Vehicle left" automatically when one appears
     # device fitting (caregiver): chest-mount height and tilt; None = profile default
     mount_height: Optional[float] = None

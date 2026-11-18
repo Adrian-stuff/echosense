@@ -5,8 +5,10 @@ way against the simulator; in Docker it runs inside the virtual Orange Pi.
 """
 from __future__ import annotations
 
+import json
 import math
 import statistics
+import struct
 import threading
 import time
 from collections import deque
@@ -54,6 +56,11 @@ class EchoSense:
         self.events: deque = deque(maxlen=200)
         self.event_listeners: list = []
         self.frame_listeners: list = []
+        self.rgb_listeners: list = []  # callables(bytes): colour frames for the console
+        self.rgb_viewers = 0
+        cfg["web"].setdefault("viewer_stride_default", cfg["web"]["viewer_stride"])
+        self._last_rgb_t = 0.0
+        self._last_rgb_sent = 0.0
         self.speech = Speech(self.engine, cfg["speech"], on_say=lambda txt: self.event("speech", txt))
         self.health = HealthMonitor(cfg["health"])
         self.battery = Battery(cfg["battery"])
@@ -132,6 +139,10 @@ class EchoSense:
             self._pinged_tracks.clear()
             self._contacts_seen = 0
             self._apply_mount()
+            self.processor.near_mode = bool(self.settings.s.near_mode)
+            src.set_rgb(self.rgb_viewers > 0)
+            if self.settings.s.near_mode and hasattr(src, "set_near_mode"):
+                src.set_near_mode(True)
             if self.record_path and src is not old:
                 if self.recorder:
                     self.recorder.close()
@@ -155,6 +166,31 @@ class EchoSense:
     @property
     def sim(self) -> SimulatedKinect | None:
         return self.source if isinstance(self.source, SimulatedKinect) else None
+
+    def _apply_near_mode(self):
+        on = bool(self.settings.s.near_mode)
+        self.processor.near_mode = on
+        src = self.source
+        if hasattr(src, "set_near_mode"):
+            src.set_near_mode(on)
+
+            def report():
+                for _ in range(20):
+                    time.sleep(0.1)
+                    if src.near_mode_result is not None:
+                        break
+                if not on:
+                    self.event("info", "Near mode off")
+                elif src.near_mode_result:
+                    self.event("info", "Near mode on: Kinect hardware near mode (0.4-3 m) + close-range memory")
+                else:
+                    self.event("info", "This Kinect has no hardware near mode (Xbox 360 model). Software near mode on: "
+                                       "obstacles that come closer than the sensor can see keep sounding for 1.5 s.")
+            threading.Thread(target=report, daemon=True).start()
+        elif on:
+            self.event("info", "Near mode on: close-range memory (this sensor has no hardware near mode)")
+        else:
+            self.event("info", "Near mode off")
 
     def _apply_mount(self):
         s = self.settings.s
@@ -232,6 +268,8 @@ class EchoSense:
                               cues=[{k: c[k] for k in ("id", "kind", "r", "az", "rank")} for c in cues],
                               pose=frame.extra.get("pose"))
 
+        if self.rgb_viewers and self.rgb_listeners:
+            self._send_rgb()
         if self.frame_listeners:
             now = time.monotonic()
             if now - self._last_packet >= 1.0 / self.cfg["web"]["viewer_fps"]:
@@ -335,10 +373,11 @@ class EchoSense:
             "type": "frame", "seq": frame.seq, "source": frame.source, "source_label": getattr(src, "label", ""),
             "timings": res.timings, "valid_ratio": round(res.valid_ratio, 3), "ground": res.ground,
             "quality": round(self.health.quality, 3), "coverage": self.coverage(),
-            "flip": getattr(src, "flip", None),
+            "flip": getattr(src, "flip", None), "has_rgb": bool(getattr(src, "has_rgb", False)),
+            "depth_stats": self.processor.depth_stats,
             "mount": {"height": self.processor.mount_height, "pitch": self.processor.mount_pitch},
             "intr": intr, "tracks": [t.to_dict(self.cfg["audio"]["ear_height"]) for t in res.tracks],
-            "reported": [o["id"] for o in res.reported], "cues": [{k: c.get(k) for k in ("id", "kind", "r", "az", "el", "rank", "ttc", "r_urgent", "label", "label_conf")} for c in cues],
+            "reported": [o["id"] for o in res.reported], "cues": [{k: c.get(k) for k in ("id", "kind", "r", "az", "el", "rank", "ttc", "r_urgent", "label", "label_conf", "memory")} for c in cues],
             "recognition": self.processor.recognizer is not None and self.processor.recognizer.available,
             "pose": frame.extra.get("pose"), "movers": frame.extra.get("movers"), "contacts": frame.extra.get("contacts", 0),
             "scene_version": frame.extra.get("scene_version"),
@@ -353,6 +392,31 @@ class EchoSense:
             "recording": self.recorder.path if self.recorder else None,
         }
         return {"state": state, "depth": mm}
+
+    # ============================================================== colour
+    def set_rgb_viewers(self, n: int):
+        """The colour stream runs only while a console is showing it (it costs USB bandwidth and CPU)."""
+        self.rgb_viewers = max(0, n)
+        if self.source:
+            self.source.set_rgb(self.rgb_viewers > 0)
+
+    def _send_rgb(self):
+        now = time.monotonic()
+        if now - self._last_rgb_sent < 1.0 / self.cfg["web"].get("rgb_fps", 8):
+            return
+        got = self.source.rgb() if self.source else None
+        if got is None or got[2] == self._last_rgb_t:
+            return
+        img, intr, t = got
+        self._last_rgb_t, self._last_rgb_sent = t, now
+        s = int(self.cfg["web"].get("rgb_stride", 2))
+        small = np.ascontiguousarray(img[::s, ::s])
+        meta = {"w": small.shape[1], "h": small.shape[0], "stride": s, "intr": intr}
+        js = json.dumps(meta, separators=(",", ":")).encode()
+        js += b" " * ((-len(js)) % 4)
+        data = b"\x03\x00\x00\x00" + struct.pack("<I", len(js)) + js + small.tobytes()
+        for fn in list(self.rgb_listeners):
+            fn(data)
 
     # ================================================================ events
     def event(self, kind: str, text: str, **data):
@@ -453,7 +517,10 @@ class EchoSense:
 
     # ================================================== console commands
     def set_setting(self, key: str, value):
-        if key in ("report_off_path", "announce"):
+        if key == "near_mode":
+            self.settings.update(near_mode=bool(value))
+            self._apply_near_mode()
+        elif key in ("report_off_path", "announce"):
             self.settings.update(**{key: bool(value)})
         elif key == "warning_distance":
             self.settings.update(warning_distance=float(value))

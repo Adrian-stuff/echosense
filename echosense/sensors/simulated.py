@@ -42,6 +42,8 @@ class SimulatedKinect(DepthSource):
         self.blocked = False
         self.head_bob = True
         self.autowalk = False
+        self.want_rgb = False
+        self._rgb = None
         self.contacts: list[dict] = []
         self._contact_last: dict[str, float] = {}
         self._thread: threading.Thread | None = None
@@ -119,21 +121,29 @@ class SimulatedKinect(DepthSource):
                 extra = self._extra(o, pitch)
                 scene = self.world.scene
                 sun, blocked = self.sun, self.blocked
+                want_rgb = self.want_rgb
+                rgb = None
                 if self._conn is None:
-                    depth = self.world.render(o, R, self.cam, self.rng, sun=sun, blocked=blocked)
+                    out = self.world.render(o, R, self.cam, self.rng, sun=sun, blocked=blocked, want_rgb=want_rgb)
+                    depth, rgb = out if want_rgb else (out, None)
             if self._conn is not None:
                 try:
                     if worker_scene is not scene:
                         self._conn.send(("scene", scene))
                         worker_scene = scene
-                    self._conn.send(("render", t, o, R, sun, blocked))
+                    self._conn.send(("render", t, o, R, sun, blocked, want_rgb))
                     buf = self._conn.recv_bytes()
+                    if want_rgb:
+                        rgb = np.frombuffer(self._conn.recv_bytes(), np.uint8).reshape(self.cam.height, self.cam.width, 3)
                 except (EOFError, BrokenPipeError, OSError):
                     self.error = "simulator render process stopped"
                     break
                 depth = np.frombuffer(buf, np.float32).reshape(self.cam.height, self.cam.width)
             # stamped on arrival, exactly like frames from the Kinect bridge
-            self._publish(depth, time.monotonic(), **extra)
+            now = time.monotonic()
+            if rgb is not None:
+                self._rgb = (rgb, now)
+            self._publish(depth, now, **extra)
 
     def _step(self, dt: float, t: float):
         f, s, turn = self.move["f"], self.move["s"], self.move["turn"]
@@ -204,6 +214,19 @@ class SimulatedKinect(DepthSource):
     def spec(self, cfg: dict) -> dict:
         return {k: self.sensor[k] for k in SPEC_KEYS} | {"preset": self.preset}
 
+    has_rgb = True
+
+    def set_rgb(self, on: bool):
+        self.want_rgb = bool(on)
+        if not on:
+            self._rgb = None
+
+    def rgb(self):
+        if self._rgb is None:
+            return None
+        intr = dict(self.intrinsics, baseline=0.0, label="Simulated camera (material colours)")
+        return self._rgb[0], intr, self._rgb[1]
+
     def info(self):
         d = super().info()
         d.update(scene=self.world.scene.get("id"), sun=self.sun, blocked=self.blocked, autowalk=self.autowalk,
@@ -226,6 +249,11 @@ def _render_worker(conn, sensor_cfg: dict, seed: int):
         if msg[0] == "scene":
             world = World(msg[1])
         elif msg[0] == "render":
-            _, t, o, R, sun, blocked = msg
+            _, t, o, R, sun, blocked, want_rgb = msg
             world.update(t)  # same t as the parent's world: pedestrians stay in sync
-            conn.send_bytes(world.render(o, R, cam, rng, sun=sun, blocked=blocked).tobytes())
+            out = world.render(o, R, cam, rng, sun=sun, blocked=blocked, want_rgb=want_rgb)
+            if want_rgb:
+                conn.send_bytes(out[0].tobytes())
+                conn.send_bytes(out[1].tobytes())
+            else:
+                conn.send_bytes(out.tobytes())

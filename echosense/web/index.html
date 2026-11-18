@@ -47,6 +47,8 @@
         <label><input type="checkbox" id="t-boxes" checked> Obstacles</label>
         <label><input type="checkbox" id="t-frustum" checked> Frustum</label>
         <label><input type="checkbox" id="t-depthcolor"> Depth colours</label>
+        <label title="Colour each depth point with the camera picture"><input type="checkbox" id="t-camcolor"> Camera colours</label>
+        <label title="Draw every depth pixel instead of every second one"><input type="checkbox" id="t-fullres"> Full resolution</label>
         <label title="Field of view of this 3D view (not the sensor)">View FOV <input type="range" id="t-vfov" min="35" max="110" step="1" value="60" style="width:80px"><output id="o-vfov">60°</output></label>
       </div>
       <div class="legend">
@@ -66,6 +68,12 @@
         <div><h3>Cue map</h3><canvas id="radar" width="220" height="212"></canvas></div>
       </div>
       <div class="meta" id="frame-meta"></div>
+    </div>
+
+    <div class="card" id="cam-card">
+      <h3>Camera <small id="cam-src">colour view with detected obstacles</small></h3>
+      <div class="inline"><button id="cam-toggle">Show camera</button><span class="meta" id="cam-meta">off: the colour stream only runs while shown</span></div>
+      <div class="camwrap" id="cam-wrap" hidden><canvas id="cam" width="320" height="240"></canvas><canvas id="cam-over" width="320" height="240"></canvas></div>
     </div>
 
     <div class="card" id="perf-card">
@@ -124,6 +132,7 @@
         <div class="seg small" id="zone"><button data-zone="corridor">Walking corridor</button><button data-zone="fov">Full field of view</button></div></div>
       <div class="checks">
 
+        <label><input type="checkbox" id="c-near"> Near mode (keep warning about obstacles closer than the sensor's minimum)</label>
         <label><input type="checkbox" id="c-announce"> Announce people and vehicles automatically</label>
         <label id="mirror-wrap" hidden><input type="checkbox" id="c-mirror"> Mirror Kinect image</label>
       </div>

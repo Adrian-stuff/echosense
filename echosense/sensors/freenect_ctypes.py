@@ -22,6 +22,7 @@ import numpy as np
 DEVICE_MOTOR, DEVICE_CAMERA, DEVICE_AUDIO = 1, 2, 4
 RES_MEDIUM = 1
 DEPTH_MM = 5  # FREENECT_DEPTH_MM: 640x480 uint16 millimetres, 0 = no reading
+VIDEO_RGB = 0  # FREENECT_VIDEO_RGB: 640x480x3 uint8 (debayered by libfreenect)
 
 
 class FrameMode(ctypes.Structure):
@@ -32,6 +33,7 @@ class FrameMode(ctypes.Structure):
 
 
 DEPTH_CB = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32)
+VIDEO_CB = DEPTH_CB
 
 
 def find_library() -> str | None:
@@ -50,9 +52,10 @@ def find_library() -> str | None:
 
 
 class FreenectDepth:
-    """Streams Kinect v1 depth (mm) to ``on_frame(np.ndarray[480, 640] uint16, timestamp)``."""
+    """Streams Kinect v1 depth (mm) to ``on_frame(np.ndarray[480, 640] uint16, timestamp)`` and,
+    while ``want_video`` is set, colour to ``on_video(np.ndarray[480, 640, 3] uint8, timestamp)``."""
 
-    def __init__(self, on_frame, index: int = 0, libpath: str | None = None):
+    def __init__(self, on_frame, index: int = 0, libpath: str | None = None, on_video=None):
         path = libpath or find_library()
         if not path:
             raise OSError("libfreenect not found (macOS: brew install libfreenect; Debian: apt install libfreenect0.5)")
@@ -67,10 +70,18 @@ class FreenectDepth:
         lib.freenect_set_depth_mode.argtypes = [ctypes.c_void_p, FrameMode]
         lib.freenect_set_depth_callback.argtypes = [ctypes.c_void_p, DEPTH_CB]
         lib.freenect_set_depth_callback.restype = None
-        for fn in ("freenect_start_depth", "freenect_stop_depth", "freenect_close_device"):
+        lib.freenect_find_video_mode.argtypes = [ctypes.c_int, ctypes.c_int]
+        lib.freenect_find_video_mode.restype = FrameMode
+        lib.freenect_set_video_mode.argtypes = [ctypes.c_void_p, FrameMode]
+        lib.freenect_set_video_callback.argtypes = [ctypes.c_void_p, VIDEO_CB]
+        lib.freenect_set_video_callback.restype = None
+        for fn in ("freenect_start_depth", "freenect_stop_depth", "freenect_close_device",
+                   "freenect_start_video", "freenect_stop_video"):
             getattr(lib, fn).argtypes = [ctypes.c_void_p]
         lib.freenect_process_events.argtypes = [ctypes.c_void_p]
         lib.freenect_shutdown.argtypes = [ctypes.c_void_p]
+        lib.freenect_set_flag.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
+        lib.freenect_set_flag.restype = ctypes.c_int
         lib.freenect_set_log_level.argtypes = [ctypes.c_void_p, ctypes.c_int]
         lib.freenect_set_log_level.restype = None
         self.on_frame = on_frame
@@ -78,6 +89,13 @@ class FreenectDepth:
         self.ctx = ctypes.c_void_p()
         self.dev = ctypes.c_void_p()
         self._cb = DEPTH_CB(self._depth_cb)  # keep a reference: ctypes callbacks must outlive their use
+        self._vcb = VIDEO_CB(self._video_cb)
+        self.on_video = on_video
+        self.want_video = False  # applied by the event thread (libfreenect calls stay on one thread)
+        self.want_near = None  # None = leave as is, True/False = request hardware near mode
+        self.near_result = None  # True if the Kinect accepted near mode, False if it refused
+        self.video_on = False
+        self.vmode = None
         self._run = False
         self._thread = None
         self.mode = None
@@ -100,6 +118,11 @@ class FreenectDepth:
             self.close()
             raise OSError("Kinect v1 does not accept the millimetre depth mode")
         lib.freenect_set_depth_callback(self.dev, self._cb)
+        self.vmode = lib.freenect_find_video_mode(RES_MEDIUM, VIDEO_RGB)
+        if self.vmode.is_valid and lib.freenect_set_video_mode(self.dev, self.vmode) >= 0:
+            lib.freenect_set_video_callback(self.dev, self._vcb)
+        else:
+            self.vmode = None
         if lib.freenect_start_depth(self.dev) < 0:
             self.close()
             raise OSError("Kinect v1 depth stream did not start")
@@ -112,8 +135,25 @@ class FreenectDepth:
         arr = np.ctypeslib.as_array(ctypes.cast(buf, ctypes.POINTER(ctypes.c_uint16)), shape=(h, w)).copy()
         self.on_frame(arr, timestamp)
 
+    def _video_cb(self, _dev, buf, timestamp):
+        if self.on_video is None:
+            return
+        w, h = self.vmode.width, self.vmode.height
+        arr = np.ctypeslib.as_array(ctypes.cast(buf, ctypes.POINTER(ctypes.c_uint8)), shape=(h, w, 3)).copy()
+        self.on_video(arr, timestamp)
+
     def _events(self):
         while self._run:
+            if self.want_near is not None:
+                # FREENECT_NEAR_MODE (1 << 18): only Kinect for Windows hardware accepts it
+                self.near_result = self.lib.freenect_set_flag(self.dev, 1 << 18, 1 if self.want_near else 0) >= 0
+                self.want_near = None
+            if self.vmode is not None and self.want_video != self.video_on:
+                if self.want_video:
+                    self.video_on = self.lib.freenect_start_video(self.dev) >= 0
+                else:
+                    self.lib.freenect_stop_video(self.dev)
+                    self.video_on = False
             if self.lib.freenect_process_events(self.ctx) < 0:
                 self._run = False
                 self.on_frame(None, 0)  # tell the owner the device went away
@@ -124,6 +164,9 @@ class FreenectDepth:
         self._run = False
         if self.dev:
             if was:
+                if self.video_on:
+                    self.lib.freenect_stop_video(self.dev)
+                    self.video_on = False
                 self.lib.freenect_stop_depth(self.dev)
             if self._thread and self._thread is not threading.current_thread():
                 self._thread.join(timeout=2)

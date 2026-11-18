@@ -41,6 +41,10 @@ MAT_NOISE = np.array([MATERIALS[n][0] for n in MAT_NAMES], np.float32)
 MAT_DROPOUT = np.array([MATERIALS[n][1] for n in MAT_NAMES], np.float32)
 MAT_PASS = np.array([MATERIALS[n][2] for n in MAT_NAMES], np.float32)
 MAT_RANGE_DROP = np.array([MATERIALS[n][3] for n in MAT_NAMES], np.float32)
+# flat colours for the simulated camera image
+MAT_RGB = np.array([{"asphalt": (72, 74, 80), "concrete": (165, 163, 156), "metal": (118, 140, 168), "glass": (150, 200, 215),
+                     "fabric": (150, 92, 140), "foliage": (72, 140, 70), "skin": (205, 160, 135), "wood": (150, 110, 75)}[n]
+                    for n in MAT_NAMES], np.float32)
 
 INF = np.float32(np.inf)
 
@@ -374,14 +378,15 @@ class World:
 
     # -------------------------------------------------------------- rendering
     def render(self, o: np.ndarray, R: np.ndarray, cam: "CameraModel", rng: np.random.Generator,
-               sun: float = 0.0, blocked: bool = False) -> np.ndarray:
+               sun: float = 0.0, blocked: bool = False, want_rgb: bool = False):
+        """Depth frame; with ``want_rgb`` also a simulated colour image from the same viewpoint."""
         H, W = cam.height, cam.width
         if blocked:
             # Hand / cloth over the lens: everything is closer than min depth.
             depth = np.zeros((H, W), np.float32)
             speck = rng.random((H, W), dtype=np.float32) < 0.01
             depth[speck] = rng.uniform(0.5, 0.6, int(speck.sum())).astype(np.float32)
-            return depth
+            return (depth, np.full((H, W, 3), 18, np.uint8)) if want_rgb else depth
 
         o = np.asarray(o, np.float32)
         dirs = (cam.dirs.reshape(-1, 3) @ R.T).reshape(H, W, 3)
@@ -424,7 +429,25 @@ class World:
             zv[closer] = t[closer]
             mv[closer] = prim.mat_id
 
-        return cam.apply_noise(zbuf, mat, rng, sun)
+        depth = cam.apply_noise(zbuf, mat, rng, sun)
+        if not want_rgb:
+            return depth
+        return depth, self._colour(o, dirs, zbuf, mat, sun)
+
+    def _colour(self, o, dirs, zbuf, mat, sun):
+        hit = np.isfinite(zbuf)
+        z = np.where(hit, zbuf, 0.0)
+        img = MAT_RGB[mat] * (0.55 + 0.45 * np.exp(-z / 7.0))[..., None]
+        ground = hit & (mat == self.ground_material)
+        if ground.any():  # paving pattern so walking and turning are visible
+            px = o[0] + z * dirs[..., 0]
+            pz = o[2] + z * dirs[..., 2]
+            tile = ((np.floor(px * 1.5) + np.floor(pz * 1.5)) % 2)[..., None] * 10.0
+            img = np.where(ground[..., None], img + tile, img)
+        up = np.clip(dirs[..., 1] / np.linalg.norm(dirs, axis=-1), 0, 1)[..., None]
+        sky = np.array([185, 205, 225], np.float32) * (1 - up) + np.array([110, 150, 205], np.float32) * up
+        img = np.where(hit[..., None], img, sky) * (1.0 + 0.35 * sun)
+        return np.clip(img, 0, 255).astype(np.uint8)
 
 
 class CameraModel:

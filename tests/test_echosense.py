@@ -450,3 +450,48 @@ def test_orange_pi_one_profile_runs_lite(tmp_path):
     assert sim.cam.width == 640 and sim.fps == 15
     assert proc.stride_used == 8 and proc.front.prestride == 2
     assert any(abs(o["r"] - 2.0) < 0.1 for o in res.reported)
+
+
+@pytest.mark.parametrize("near", [True, False])
+def test_near_mode_keeps_warning_inside_minimum_range(cfg, near):
+    pole = {"type": "cylinder", "name": "pole", "x": 0.0, "z": 2.0, "r": 0.15, "y1": 2.5, "material": "concrete"}
+    sim = SimulatedKinect(cfg, scene(pole), seed=1)
+    sim.head_bob = False
+    proc = DepthProcessor(cfg)
+    proc.near_mode = near
+    t = 0.0
+    seen_close = False
+    for f in range(60):  # walk at 1 m/s from 1.85 m to 0.25 m from the pole surface (sensor minimum is 0.5 m)
+        t = f / 30
+        sim.z = min(1.6, f / 30)
+        res = proc.process(DepthFrame(sim.capture(t)[0], t, f + 1, sim.intrinsics, "sim"), 2.5)
+        if res.reported and res.reported[0]["r"] < 0.9:
+            seen_close = True
+    assert seen_close
+    t += 0.5  # half a second after the pole went inside the minimum range
+    res = proc.process(DepthFrame(sim.capture(t)[0], t, 99, sim.intrinsics, "sim"), 2.5)
+    still = [o for o in res.reported if o["memory"]]
+    assert bool(still) == near
+    if near:
+        assert still[0]["r"] < 0.5
+
+
+def test_camera_stream_only_when_watched(tmp_path, cfg):
+    from echosense.app import EchoSense
+
+    cfg["speech"]["engine"] = "none"
+    app = EchoSense(cfg, source="sim", scene="maysan_street", audio="none", settings_path=str(tmp_path / "s.json"))
+    packets = []
+    app.rgb_listeners.append(packets.append)
+    app.start()
+    try:
+        time.sleep(1.0)
+        assert app.source.rgb() is None and not packets  # nobody watching: no colour rendering at all
+        app.set_rgb_viewers(1)
+        time.sleep(1.5)
+        img, intr, _ = app.source.rgb()
+        assert img.shape == (424, 512, 3) and img.dtype == np.uint8 and img.std() > 10
+        assert packets and packets[-1][0] == 3
+        app.set_rgb_viewers(0)
+    finally:
+        app.stop()

@@ -90,6 +90,23 @@ fragile Python bindings are needed.
    1.5 m and head-level objects from about 1.5 m outward. Tilting down sees drop-offs nearer but loses
    head-level coverage. Try it with the *Mount tilt* slider in the simulator before deciding.
 
+### Camera view and near mode
+
+* **Camera** card: the colour picture (Kinect v1 colour camera; in the simulator, a rendered view in
+  material colours) with every detected obstacle boxed and labelled. *Camera colours* paints the
+  3D point cloud with the real colours. The colour stream only runs while someone is watching it,
+  so the device pays nothing for it otherwise. The Kinect v2 bridge streams depth only for now.
+* **Full resolution** draws every depth pixel (640×480 on a Kinect v1) instead of every second one.
+  Processing already uses the sensor's full resolution and frame rate: nothing is clipped. The
+  Fitting card shows the live nearest and farthest depth.
+* **Near mode** (Fitting card):
+  * Asks the sensor for hardware near mode (0.4–3 m). Only the Kinect *for Windows* has it. The
+    Xbox 360 Kinect refuses it (tested: `freenect_set_flag` returns −1). It already reports down to
+    about 0.45 m, and nothing closer.
+  * Adds close-range memory on any sensor: an obstacle in the path that comes closer than about
+    0.9 m and then vanishes into the blind zone keeps sounding as "very close" for 1.5 s, instead
+    of going silent the moment it matters most.
+
 ## Virtual Orange Pi (Docker)
 
 ```bash

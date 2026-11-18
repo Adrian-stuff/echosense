@@ -28,7 +28,7 @@ function connect() {
   ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
   ws.binaryType = 'arraybuffer';
   ws.onmessage = (ev) => (typeof ev.data === 'string' ? onJson(JSON.parse(ev.data)) : onBinary(ev.data));
-  ws.onopen = () => { if (audio.on) send({ t: 'audio', on: true }); };
+  ws.onopen = () => { if (audio.on) send({ t: 'audio', on: true }); if (cam.on) send({ t: 'rgb', on: true }); };
   ws.onclose = () => { pill('p-health', 'offline', 'bad'); setTimeout(connect, 1200); };
 }
 const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
@@ -43,6 +43,9 @@ function onBinary(buf) {
     onFrame(state, depth);
   } else if (type === 2) {
     playAudio(new Int16Array(buf, 4));
+  } else if (type === 3) {
+    const n = new DataView(buf).getUint32(4, true);
+    onRgb(JSON.parse(dec.decode(new Uint8Array(buf, 8, n))), new Uint8Array(buf, 8 + n));
   }
 }
 
@@ -270,6 +273,12 @@ function updatePoints(s, depth) {
   const a = -s.mount.pitch * DEG, c = Math.cos(a), sn = Math.sin(a), H = s.mount.height;
   const [nx, ny, nz, nd] = s.ground.plane;
   const byDepth = $('t-depthcolor').checked;
+  const byCam = $('t-camcolor').checked && cam.img && cam.meta;
+  let cfx, cfy, ccx, ccy, cb, cs, cw, ch, cpx;
+  if (byCam) {
+    const ci = cam.meta.intr; cs = cam.meta.stride;
+    cfx = ci.fx; cfy = ci.fy; ccx = ci.cx; ccy = ci.cy; cb = ci.baseline || 0; cw = cam.meta.w; ch = cam.meta.h; cpx = cam.img;
+  }
   const pos = pts.pos, col = pts.col;
   let k = 0;
   for (let v = 0; v < h; v++) {
@@ -284,7 +293,17 @@ function updatePoints(s, depth) {
       const i = k * 3;
       pos[i] = X; pos[i + 1] = hp; pos[i + 2] = -Z;
       let r, g, b;
-      if (byDepth) {
+      let camHit = false;
+      if (byCam) {
+        const cu = Math.round((cfx * (xc + cb) / z + ccx) / cs), cv = Math.round((cfy * yc / z + ccy) / cs);
+        if (cu >= 0 && cv >= 0 && cu < cw && cv < ch) {
+          const q = (cv * cw + cu) * 3;
+          r = cpx[q] / 255; g = cpx[q + 1] / 255; b = cpx[q + 2] / 255;
+          camHit = true;
+        }
+      }
+      if (camHit) { /* coloured from the camera */ }
+      else if (byDepth) {
         const t = Math.max(0, Math.min(255, ((z - 0.5) / 4.0) * 255)) | 0;
         r = turboLUT[t * 3] / 255; g = turboLUT[t * 3 + 1] / 255; b = turboLUT[t * 3 + 2] / 255;
       } else if (hp < -dthr) { r = 0.66; g = 0.55; b = 1.0; }
@@ -442,7 +461,7 @@ function updatePanels(s) {
     html = `<div class="cue"><div class="big">Training ${t ? `· ${t.kind} · ${t.r} m · ${sideTxt(t.az)}` : '· blind trial'}</div><div class="sub">${t ? 'stationary practice target' : 'click the dial where the sound seems to be'}</div></div>`;
   } else if (s.cues.length) {
     const c = s.cues[0], k = KIND[c.kind] || KIND.body;
-    const nm = c.label && c.label !== 'unknown' ? LABEL[c.label] || c.label : k.label;
+    const nm = (c.memory ? 'Very close · ' : '') + (c.label && c.label !== 'unknown' ? LABEL[c.label] || c.label : k.label);
     html = `<div class="cue" style="border-left-color:#${k.color.toString(16).padStart(6, '0')}"><div class="big">${nm} · ${c.r.toFixed(2)} m · ${sideTxt(c.az)}</div>` +
       `<div class="sub">${k.sound}, every ${cueInterval(c.r_urgent ?? c.r, 0, s.range_m).toFixed(2)} s · elevation ${c.el >= 0 ? '+' : ''}${c.el.toFixed(0)}°` +
       `${c.ttc != null ? ` · <b>approaching, contact in ${c.ttc.toFixed(1)} s</b>` : ''}</div>` +
@@ -467,6 +486,7 @@ function updatePanels(s) {
   $('b-profile').innerHTML = `Sound: ${set.profile} <kbd>O</kbd>`;
 
   $('sim-card').hidden = s.source !== 'sim';
+  $('cam-card').hidden = !s.has_rgb;
   $('contacts').textContent = `${s.contacts} contact${s.contacts === 1 ? '' : 's'} with obstacles`;
   syncSlider('m-height', s.mount.height, 'o-height', (v) => `${(+v).toFixed(2)} m`);
   syncSlider('m-pitch', s.mount.pitch, 'o-pitch', (v) => `${(+v).toFixed(1)}°`);
@@ -477,7 +497,8 @@ function updatePanels(s) {
   if (cv) {
     const m = (v, gapText) => (v == null ? `<span class="gap">${gapText}</span>` : `from ${v.toFixed(2)} m`);
     $('coverage').innerHTML = [
-      ['Sensor', `${hello.sensor.label || hello.sensor.model} · ${cv.hfov}° × ${cv.vfov}° · ${cv.min_depth}–${cv.max_depth} m`],
+      ['Sensor', `${hello.sensor.label || hello.sensor.model} · ${cv.hfov}° × ${cv.vfov}° · spec ${cv.min_depth}–${cv.max_depth} m`],
+      ['Depth now', s.depth_stats && s.depth_stats.near != null ? `nearest ${s.depth_stats.near.toFixed(2)} m · farthest ${s.depth_stats.far.toFixed(2)} m · ${s.intr.width}×${s.intr.height}` : '—'],
       ['Floor visible', m(cv.floor_from, 'never (tilt down)')],
       [`Head height (${cv.head_height} m)`, m(cv.head_from, 'not covered (tilt up)')],
       ['Full corridor width', m(cv.corridor_from, 'beyond range')],
@@ -488,6 +509,7 @@ function updatePanels(s) {
   $('mirror-wrap').hidden = !['kinect2', 'kinect1'].includes(s.source);
   if (s.flip != null && document.activeElement !== $('c-mirror')) $('c-mirror').checked = s.flip;
   $('c-announce').checked = !!set.announce;
+  $('c-near').checked = !!set.near_mode;
   $('ground-est').textContent = s.ground.ok ? `floor says ${s.ground.height.toFixed(2)} m, ${s.ground.pitch.toFixed(1)}°` : 'floor not visible';
   $('b-log').textContent = s.logging ? 'Stop logging' : 'Start logging';
   $('b-log').classList.toggle('on', s.logging);
@@ -616,6 +638,66 @@ function toast(text) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
+
+// ---------------------------------------------------------------- camera
+const cam = { on: false, img: null, meta: null, frames: 0, t0: performance.now() };
+const camCtx = $('cam').getContext('2d');
+const overCtx = $('cam-over').getContext('2d');
+let camImgData = null;
+$('cam-toggle').onclick = () => {
+  cam.on = !cam.on;
+  $('cam-toggle').classList.toggle('on', cam.on);
+  $('cam-toggle').textContent = cam.on ? 'Hide camera' : 'Show camera';
+  $('cam-wrap').hidden = !cam.on;
+  if (!cam.on) { cam.img = null; $('cam-meta').textContent = 'off: the colour stream only runs while shown'; }
+  send({ t: 'rgb', on: cam.on });
+};
+$('t-camcolor').onchange = (e) => { if (e.target.checked && !cam.on) $('cam-toggle').click(); };
+function onRgb(meta, px) {
+  if (!cam.on) return;
+  cam.meta = meta; cam.img = px; cam.frames++;
+  const cv = $('cam'), ov = $('cam-over');
+  if (cv.width !== meta.w || cv.height !== meta.h) { cv.width = ov.width = meta.w; cv.height = ov.height = meta.h; camImgData = null; }
+  if (!camImgData) camImgData = camCtx.createImageData(meta.w, meta.h);
+  const d = camImgData.data;
+  for (let i = 0, j = 0; i < px.length; i += 3, j += 4) { d[j] = px[i]; d[j + 1] = px[i + 1]; d[j + 2] = px[i + 2]; d[j + 3] = 255; }
+  camCtx.putImageData(camImgData, 0, 0);
+  const secs = (performance.now() - cam.t0) / 1000;
+  if (secs > 2) { cam.fps = cam.frames / secs; cam.frames = 0; cam.t0 = performance.now(); }
+  $('cam-src').textContent = meta.intr.label || 'camera';
+  $('cam-meta').textContent = `${meta.w * meta.stride}×${meta.h * meta.stride} shown at ${meta.w}×${meta.h}${cam.fps ? ` · ${cam.fps.toFixed(0)} fps` : ''}`;
+  drawCamOverlay();
+}
+function drawCamOverlay() {
+  const g = overCtx, Wd = $('cam-over').width, Hd = $('cam-over').height;
+  g.clearRect(0, 0, Wd, Hd);
+  if (!st || !cam.meta) return;
+  const ci = cam.meta.intr, s = cam.meta.stride, base = ci.baseline || 0;
+  const a = -st.mount.pitch * DEG, c = Math.cos(a), sn = Math.sin(a), H = st.mount.height;
+  // body (x right, y up from floor, z fwd) -> camera (x right, y down, z fwd): inverse of the mount rotation
+  const toCam = (x, y, z) => { const yb = y - H; return [x, -c * yb - sn * z, -sn * yb + c * z]; };
+  const proj = (p) => (p[2] > 0.05 ? [(ci.fx * (p[0] + base) / p[2] + ci.cx) / s, (ci.fy * p[1] / p[2] + ci.cy) / s] : null);
+  const cued = new Set((st.cues || []).map((q) => q.id));
+  g.lineWidth = 2; g.font = '11px ui-sans-serif';
+  for (const t of st.tracks) {
+    if (!t.confirmed || t.suppressed) continue;
+    const [x0, x1, z0] = t.box;
+    const y0 = t.kind === 'drop' ? 0 : Math.max(0, t.h_min), y1 = t.kind === 'drop' ? 0.05 : t.h_max;
+    const pts = [[x0, y0, z0], [x1, y0, z0], [x0, y1, z0], [x1, y1, z0]].map((p) => proj(toCam(...p))).filter(Boolean);
+    if (pts.length < 2) continue;
+    const us = pts.map((p) => p[0]), vs = pts.map((p) => p[1]);
+    const u0 = Math.min(...us), u1 = Math.max(...us), v0 = Math.min(...vs), v1 = Math.max(...vs);
+    const col = '#' + ((t.in_path ? KIND[t.kind]?.color : 0x9aa7b8) ?? 0xffffff).toString(16).padStart(6, '0');
+    g.strokeStyle = col; g.globalAlpha = cued.has(t.id) ? 1 : 0.7;
+    g.strokeRect(u0, v0, Math.max(2, u1 - u0), Math.max(2, v1 - v0));
+    const text = `${LABEL[t.label] || t.label} ${t.r.toFixed(1)} m`;
+    const tw = g.measureText(text).width + 6;
+    g.fillStyle = 'rgba(10,13,18,0.8)'; g.fillRect(u0, Math.max(0, v0 - 15), tw, 14);
+    g.fillStyle = col; g.fillText(text, u0 + 3, Math.max(11, v0 - 4));
+  }
+  g.globalAlpha = 1;
+}
+
 // ------------------------------------------------------------- controls
 document.querySelectorAll('[data-action]').forEach((b) => (b.onclick = () => send({ t: 'action', action: b.dataset.action })));
 $('scene').onchange = () => send({ t: 'sim', key: 'scene', value: $('scene').value });
@@ -627,6 +709,8 @@ $('s-reset').onclick = () => send({ t: 'sim', key: 'reset' });
 $('m-cal').onclick = () => send({ t: 'setting', key: 'calibrate_mount' });
 document.querySelectorAll('#zone button').forEach((b) => (b.onclick = () => send({ t: 'setting', key: 'report_off_path', value: b.dataset.zone === 'fov' })));
 $('preset').onchange = () => { toast('Switching simulated sensor…'); send({ t: 'sim', key: 'sensor_preset', value: $('preset').value }); };
+$('t-fullres').onchange = (e) => send({ t: 'viewer', stride: e.target.checked ? 1 : 0 });
+$('c-near').onchange = (e) => send({ t: 'setting', key: 'near_mode', value: e.target.checked });
 $('c-announce').onchange = (e) => send({ t: 'setting', key: 'announce', value: e.target.checked });
 $('c-mirror').onchange = (e) => send({ t: 'setting', key: 'flip_horizontal', value: e.target.checked });
 const sliderSetting = (id, key, simKey) => {

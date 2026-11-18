@@ -154,6 +154,7 @@ class Track:
     eligible_since: float | None = None  # capture time it first became reportable (latency reference)
     reporting: bool = False
     probs: np.ndarray | None = None  # smoothed class probabilities from the recogniser
+    memory: bool = False  # near mode: kept alive after going too close for the sensor to see
     features: np.ndarray | None = None
 
     @property
@@ -206,6 +207,7 @@ class Track:
                 "el": round(self.el(ear_height), 1), "x": round(self.x, 3), "z": round(self.z, 3),
                 "h_min": round(self.h_min, 2), "h_max": round(self.h_max, 2), "width": round(self.width, 2),
                 "in_path": self.in_path, "suppressed": self.suppressed, "confirmed": self.confirmed,
+                "memory": self.memory,
                 "vel_r": round(self.vel_r, 2), "first_seen": self.first_seen, "eligible_since": self.eligible_since,
                 "ttc": None if self.ttc() is None else round(self.ttc(), 2), "r_urgent": round(self.urgency_range(), 3),
                 "label": self.label, "label_conf": round(self.label_conf, 2),
@@ -238,6 +240,8 @@ class DepthProcessor:
         self.rng = np.random.default_rng(7)
         self.front = DepthFrontEnd(self.p)
         self.max_seen_depth = 0.0
+        self.near_mode = bool(self.p.get("near_mode", False))
+        self.depth_stats = {"near": None, "far": None}
         self.recognizer = ObjectRecognizer(self.p.get("object_model") or None) if self.p.get("recognition", True) else None
         self.set_mount(cfg["sensor"]["mount_height"], cfg["sensor"]["mount_pitch_deg"])
 
@@ -307,7 +311,9 @@ class DepthProcessor:
         z = self.front(depth).ravel()
         valid = z > 0
         if valid.any():  # the sensor's effective depth limit, learned from the data (any sensor model)
-            zmax = float(z[valid].max())
+            zv = z[valid]
+            self.depth_stats = {"near": round(float(np.percentile(zv, 0.2)), 3), "far": round(float(np.percentile(zv, 99.8)), 3)}
+            zmax = float(zv.max())
             self.max_seen_depth = zmax if zmax > self.max_seen_depth else self.max_seen_depth * 0.9995 + zmax * 0.0005
         zc = z[valid]
         cols = self.cols[valid]
@@ -680,7 +686,27 @@ class DepthProcessor:
                 tr.confirmed, tr.confirmed_at = True, t
             self._next_id += 1
             self.tracks.append(tr)
-        self.tracks = [tr for tr in self.tracks if t - tr.last_seen <= p["drop_time"]]
+        keep = []
+        for tr in self.tracks:
+            age = t - tr.last_seen
+            if age <= p["drop_time"]:
+                if age == 0:
+                    tr.memory = False
+                keep.append(tr)
+            elif self.near_mode and self._too_close_to_see(tr) and age <= p["near_hold_time"]:
+                # near mode: it was in the path, close and confirmed, and vanished because it went
+                # inside the sensor's minimum range (~0.45 m on a Kinect v1). Keep warning instead
+                # of going silent, closing in at its last speed (at least a slow step).
+                tr.memory = True
+                tr.r = max(0.2, tr.r + min(tr.vel_r, -0.2) * (t - getattr(tr, "_mem_t", tr.last_seen)))
+                tr._mem_t = t
+                keep.append(tr)
+        self.tracks = keep
+
+    def _too_close_to_see(self, tr: Track) -> bool:
+        p = self.p
+        return (tr.confirmed and tr.in_path and not tr.suppressed and tr.kind not in ("drop", "edge")
+                and (tr.r < p["near_hold_distance"] or tr.memory))
 
     def _recognise(self, tr: Track, ob: Obstacle):
         if ob.features is None or self.recognizer is None:

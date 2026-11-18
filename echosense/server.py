@@ -32,6 +32,8 @@ class Client:
         self.q: asyncio.Queue = asyncio.Queue()
         self.frame_pending = False
         self.audio_fn = None
+        self.rgb = False
+        self.rgb_pending = False
 
 
 class ConsoleServer:
@@ -41,6 +43,7 @@ class ConsoleServer:
         self.clients: set[Client] = set()
         self.loop: asyncio.AbstractEventLoop | None = None
         self._frame_bytes: bytes | None = None
+        self._rgb_bytes: bytes | None = None
         self.web = web.Application()
         self.web.router.add_get("/", self.index)
         self.web.router.add_get("/ws", self.ws_handler)
@@ -74,6 +77,19 @@ class ConsoleServer:
                 c.frame_pending = True
                 c.q.put_nowait(("frame", None))
 
+    def _on_rgb(self, data: bytes):  # processing thread
+        self.loop.call_soon_threadsafe(self._push_rgb, data)
+
+    def _push_rgb(self, data: bytes):
+        self._rgb_bytes = data
+        for c in self.clients:
+            if c.rgb and not c.rgb_pending:
+                c.rgb_pending = True
+                c.q.put_nowait(("rgb", None))
+
+    def _rgb_count(self):
+        self.es.set_rgb_viewers(sum(1 for c in self.clients if c.rgb))
+
     def _on_event(self, ev: dict):
         self.loop.call_soon_threadsafe(self._broadcast, ev)
 
@@ -101,6 +117,9 @@ class ConsoleServer:
         finally:
             self.clients.discard(c)
             self._stop_audio(c)
+            if c.rgb:
+                c.rgb = False
+                self._rgb_count()
             sender.cancel()
         return ws
 
@@ -114,6 +133,10 @@ class ConsoleServer:
                     c.frame_pending = False
                     if self._frame_bytes:
                         await c.ws.send_bytes(self._frame_bytes)
+                elif kind == "rgb":
+                    c.rgb_pending = False
+                    if self._rgb_bytes and c.rgb:
+                        await c.ws.send_bytes(self._rgb_bytes)
                 elif kind == "audio":
                     await c.ws.send_bytes(b"\x02\x00\x00\x00" + payload)
                 else:
@@ -155,6 +178,12 @@ class ConsoleServer:
                     self.loop.call_soon_threadsafe(put)
                 c.audio_fn = fn
                 es.browser_tap.listeners.append(fn)
+        elif t == "viewer":
+            st = int(m.get("stride") or 0)
+            self.es.cfg["web"]["viewer_stride"] = st if st > 0 else self.es.cfg["web"].get("viewer_stride_default", 2)
+        elif t == "rgb":
+            c.rgb = bool(m.get("on"))
+            self._rgb_count()
         elif t == "hello":
             await c.ws.send_json(es.hello())
 
@@ -163,6 +192,7 @@ class ConsoleServer:
         self.loop = asyncio.get_running_loop()
         self.es.frame_listeners.append(self._on_frame)
         self.es.event_listeners.append(self._on_event)
+        self.es.rgb_listeners.append(self._on_rgb)
         self.es.perf.listeners.append(lambda sample: self.loop.call_soon_threadsafe(self._broadcast, {"type": "perf", **sample}))
         runner = web.AppRunner(self.web, access_log=None)
         await runner.setup()

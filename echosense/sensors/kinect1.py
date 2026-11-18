@@ -44,6 +44,10 @@ class Kinect1Source(DepthSource):
         if self.flip:
             self.intrinsics["cx"] = 639 - 319.5
         self._last = 0.0
+        self._rgb = None
+        # Kinect v1 colour camera: its own lens ~2.5 cm beside the IR camera, slightly wider view
+        self.rgb_intrinsics = {"width": 640, "height": 480, "fx": 525.0, "fy": 525.0, "cx": 319.5, "cy": 239.5,
+                               "baseline": float(s.get("kinect1_rgb_baseline", 0.025)), "label": "Kinect v1 colour camera"}
         self._dev = None
         self._thread = None
         self._fn = None
@@ -62,7 +66,7 @@ class Kinect1Source(DepthSource):
             # after it is plugged in, USB needs a moment before libfreenect can see it again
             err = None
             for attempt in range(5):
-                self._dev = FreenectDepth(self._on_frame)
+                self._dev = FreenectDepth(self._on_frame, on_video=self._on_video)
                 try:
                     self._dev.open()
                     err = None
@@ -80,6 +84,41 @@ class Kinect1Source(DepthSource):
         super().start()
         self._thread = threading.Thread(target=self._run_sync, name="kinect1", daemon=True)
         self._thread.start()
+
+    def set_near_mode(self, on: bool):
+        """Ask the Kinect for hardware near mode (0.4-3 m). Kinect for Windows accepts it; the Xbox 360
+        model refuses, and ``near_mode_result`` becomes False a moment later."""
+        if self._dev is not None:
+            self._dev.near_result = None
+            self._dev.want_near = bool(on)
+
+    @property
+    def near_mode_result(self):
+        return None if self._dev is None else self._dev.near_result
+
+    @property
+    def has_rgb(self):
+        return self._dev is not None and self._dev.vmode is not None
+
+    def set_rgb(self, on: bool):
+        if self._dev is not None:
+            self._dev.want_video = bool(on)
+            if not on:
+                self._rgb = None
+
+    def _on_video(self, img, _ts):
+        if self.flip:
+            img = np.ascontiguousarray(img[:, ::-1])
+        self._rgb = (img, time.monotonic())
+
+    def rgb(self):
+        if self._rgb is None:
+            return None
+        intr = dict(self.rgb_intrinsics)
+        if self.flip:
+            intr["cx"] = intr["width"] - 1 - intr["cx"]
+            intr["baseline"] = -intr["baseline"]
+        return self._rgb[0], intr, self._rgb[1]
 
     def _on_frame(self, mm, _ts):
         if mm is None:

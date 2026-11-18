@@ -137,3 +137,6 @@ kbd { font: 10px ui-monospace, monospace; color: var(--muted); border: 1px solid
 .labels3d span { position: absolute; transform: translate(-50%, -100%); font-size: 11px; padding: 1px 6px; border-radius: 4px;
   background: rgba(10,13,18,.8); border: 1px solid var(--line); white-space: nowrap; color: var(--text); }
 .labels3d span.cued { border-color: #fff; font-weight: 650; }
+.camwrap { position: relative; margin-top: 6px; }
+.camwrap canvas { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid var(--line); background: #05070a; }
+.camwrap canvas + canvas { position: absolute; inset: 0; border-color: transparent; background: transparent; }

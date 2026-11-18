@@ -73,6 +73,9 @@ DEFAULTS: dict = {
         "assoc_gate": 0.6,
         "smoothing": 0.5,
         "velocity_gain": 0.15,
+        "near_mode": False,  # keep warning about an obstacle that goes inside the sensor's minimum range
+        "near_hold_distance": 0.9,
+        "near_hold_time": 1.5,
         "overhang_min_height": 1.0,  # nothing below this = head-level hazard
         "low_max_height": 0.45,  # nothing above this = low / tripping hazard
         "priority_bonus": 0.25,  # head-level and drop-offs reported earlier
@@ -100,7 +103,8 @@ DEFAULTS: dict = {
         "alert_repeat": 8.0,
     },
     "battery": {"capacity_hours": 4.0, "low_warning": 20, "critical_warning": 10},
-    "web": {"enabled": True, "host": "127.0.0.1", "port": 8080, "viewer_stride": 2, "viewer_fps": 15},
+    "web": {"enabled": True, "host": "127.0.0.1", "port": 8080, "viewer_stride": 2, "viewer_fps": 15,
+            "rgb_fps": 8, "rgb_stride": 2},
     "paths": {"settings": "~/.echosense/settings.json", "logs": "logs"},
     "phrases": {
         "startup": "Echo-Sense starting.",

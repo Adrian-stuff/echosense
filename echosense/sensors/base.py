@@ -60,6 +60,16 @@ class DepthSource:
         with self._lock:
             self._lock.notify_all()
 
+    # ---- optional colour camera (Kinect v1 RGB, simulator); off unless someone is watching
+    has_rgb = False
+
+    def set_rgb(self, on: bool):
+        pass
+
+    def rgb(self):
+        """(image HxWx3 uint8, intrinsics dict, time) of the newest colour frame, or None."""
+        return None
+
     def spec(self, cfg: dict) -> dict:
         """What this sensor sees: intrinsics, depth range, model. Drives the viewer and coverage figures."""
         s = cfg["sensor"]
