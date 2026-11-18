@@ -90,6 +90,21 @@ fragile Python bindings are needed.
    1.5 m and head-level objects from about 1.5 m outward. Tilting down sees drop-offs nearer but loses
    head-level coverage. Try it with the *Mount tilt* slider in the simulator before deciding.
 
+### If the Kinect drops out
+
+A Kinect can fall off USB for a moment (a hub hiccup, a loose cable, a power dip). libfreenect then
+logs "USB camera marked dead" and stops streaming. Echo-Sense watches for this:
+* no depth for 1.5 s, or the driver reporting the device lost, makes it say *"Sensor not
+  responding. Use your cane."*
+* it reopens the Kinect every couple of seconds until the stream is back, then says *"Sensor OK"*
+  (tested on a Kinect v1: back in about 3 s)
+* plugging the Kinect in later is enough; no restart needed
+
+On the device profiles (`orangepi5`, `orangepi_one`) a missing Kinect is never replaced by the
+simulator (`allow_sim_fallback: false`): fake depth must not drive real cues. On a laptop it falls
+back to the simulator and switches to the Kinect when it appears. Fewer USB hops help: plug the
+Kinect into the computer directly or into a powered hub, not through a chain of hubs.
+
 ### Camera view and near mode
 
 * **Camera** card: the colour picture (Kinect v1 colour camera; in the simulator, a rendered view in

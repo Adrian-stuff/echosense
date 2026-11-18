@@ -29,7 +29,7 @@ from .processing.objects import SPOKEN
 from .processing.pipeline import DepthProcessor
 from .sim.world import list_scenes
 from .sensors.presets import PRESETS, coverage
-from .sensors import Recorder, SimulatedKinect, SourceError, available_sources, open_source
+from .sensors import NoSensor, Recorder, SimulatedKinect, SourceError, available_sources, open_source
 
 
 def volume_gain(v: int) -> float:
@@ -73,6 +73,10 @@ class EchoSense:
         self.recorder = None
         self.running = False
         self._source_lock = threading.Lock()
+        self._hw_target = None  # hardware source to keep alive ("kinect1", "kinect2" or "auto")
+        self._reconnecting = False
+        self._last_reconnect = 0.0
+        self._outage_since = None
         self._last_packet = 0.0
         self._contacts_seen = 0
         self._pinged_tracks: set = set()
@@ -105,6 +109,7 @@ class EchoSense:
             threading.Thread(target=self._self_test, name="self-test", daemon=True).start()
 
     def stop(self):
+        self._hw_target = None  # shutting down: nothing to reconnect
         self.running = False
         self.perf.stop()
         if self.source:
@@ -116,7 +121,10 @@ class EchoSense:
         self.logger.stop()
 
     # ============================================================== sources
-    def switch_source(self, name: str) -> bool:
+    def switch_source(self, name: str, reconnect: bool = False) -> bool:
+        hardware = name == "auto" or name.startswith("kinect")
+        if not reconnect:
+            self._hw_target = name if hardware else None
         with self._source_lock:
             old = self.source
             same = old is not None and (old.kind == name or name.startswith("replay:") and old.kind == "replay")
@@ -125,10 +133,19 @@ class EchoSense:
             try:
                 src = open_source(name, self.cfg, self.scene)
             except SourceError as e:
+                if reconnect:
+                    if same:  # the device is still gone: keep searching, never substitute fake depth
+                        self.source = NoSensor(name, str(e))
+                        self.source.start()
+                    return False
                 self.event("error", f"Could not open {name}: {e}")
-                if old is not None and not same:
+                if old is not None and not same and old.kind != "none":
                     return False  # keep the current source running
-                src = open_source("sim", self.cfg, self.scene)
+                if hardware and not self.cfg.get("allow_sim_fallback", True):
+                    src = NoSensor(name, str(e))
+                    src.start()
+                else:
+                    src = open_source("sim", self.cfg, self.scene)
             if old is not None and not same and old is not src:
                 old.stop()
             self.source = src
@@ -278,7 +295,53 @@ class EchoSense:
                 for fn in list(self.frame_listeners):
                     fn(packet)
 
+    def _watchdog(self, now: float):
+        """Kinects can drop off USB for a moment (a hub hiccup, a loose cable, a brown-out): libfreenect
+        then marks the camera dead and stops streaming. Reopen until the stream is back. When the
+        Kinect was asked for but isn't there (device: "no sensor"; laptop: simulator stand-in), keep
+        looking for it so plugging it in is enough."""
+        if self._hw_target is None or self._reconnecting:
+            return
+        src = self.source
+        kind = getattr(src, "kind", None)
+        rc = self.cfg.get("reconnect", {})
+        retry = rc.get("retry_s", 2.0)
+        if kind in ("kinect1", "kinect2"):
+            last = self.health.last_frame
+            stalled = (not src.running or (last is None and self._outage_since is not None)
+                       or (last is not None and now - last > rc.get("stall_s", 1.5)))
+            if not stalled:
+                if self._outage_since is not None and last is not None:
+                    self.event("info", f"Depth sensor reconnected after {now - self._outage_since:.1f} s")
+                    self.logger.write("reconnected", outage_s=round(now - self._outage_since, 2))
+                    self._outage_since = None
+                return
+            if self._outage_since is None:
+                self._outage_since = now
+                self.event("warning", "Depth sensor stopped streaming; reconnecting"
+                           + (f" ({src.error})" if src.error else ""))
+                self.logger.write("disconnected", source=kind)
+            target = self._hw_target if self._hw_target != "auto" else kind
+        else:
+            if kind == "none" and self._outage_since is None:
+                self._outage_since = now
+            retry = retry if kind == "none" else 5.0
+            target = self._hw_target
+        if now - self._last_reconnect < retry:
+            return
+        self._reconnecting, self._last_reconnect = True, now
+
+        def run():
+            try:
+                self.switch_source(target, reconnect=True)
+            finally:
+                self._last_reconnect = time.monotonic()
+                self._reconnecting = False
+
+        threading.Thread(target=run, name="reconnect", daemon=True).start()
+
     def _tick(self, now: float):
+        self._watchdog(now)
         ph = self.cfg["phrases"]
         st = self.health.tick(now)
         if st and self.settings.s.power:

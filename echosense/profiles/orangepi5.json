@@ -1,12 +1,33 @@
 {
   "_comment": "Orange Pi 5 (RK3588S, 4x A76 + 4x A55). Used on the real board and by the Docker virtual device.",
-  "processing": {"stride": 4, "confirm_frames": 2},
-  "audio": {"driver": "local", "block_size": 1024},
-  "web": {"host": "0.0.0.0", "viewer_fps": 10, "viewer_stride": 4},
-  "paths": {"settings": "~/.echosense/settings.json", "logs": "~/echosense-logs"},
+  "processing": {
+    "stride": 4,
+    "confirm_frames": 2
+  },
+  "audio": {
+    "driver": "local",
+    "block_size": 1024
+  },
+  "web": {
+    "host": "0.0.0.0",
+    "viewer_fps": 10,
+    "viewer_stride": 4
+  },
+  "paths": {
+    "settings": "~/.echosense/settings.json",
+    "logs": "~/echosense-logs"
+  },
   "gpio": {
     "chip": "gpiochip1",
     "buttons": {},
-    "_buttons_example": {"power": 0, "volume_up": 1, "volume_down": 2, "range_next": 3, "mode_next": 4, "battery": 5}
-  }
+    "_buttons_example": {
+      "power": 0,
+      "volume_up": 1,
+      "volume_down": 2,
+      "range_next": 3,
+      "mode_next": 4,
+      "battery": 5
+    }
+  },
+  "allow_sim_fallback": false
 }

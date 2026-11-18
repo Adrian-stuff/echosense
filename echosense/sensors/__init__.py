@@ -1,12 +1,12 @@
 """Depth sources. ``open_source`` picks one by name; ``auto`` prefers real hardware."""
 from __future__ import annotations
 
-from .base import DepthFrame, DepthSource, SourceError
+from .base import DepthFrame, DepthSource, NoSensor, SourceError
 from .kinect2 import Kinect2Source, find_bridge
 from .replay import Recorder, ReplaySource
 from .simulated import SimulatedKinect
 
-__all__ = ["DepthFrame", "DepthSource", "SourceError", "open_source", "available_sources", "Recorder",
+__all__ = ["DepthFrame", "DepthSource", "NoSensor", "SourceError", "open_source", "available_sources", "Recorder",
            "SimulatedKinect", "Kinect2Source", "ReplaySource"]
 
 
@@ -31,6 +31,8 @@ def open_source(name: str, cfg: dict, scene: str = "maysan_street") -> DepthSour
                 return open_source(cand, cfg, scene)
             except SourceError as e:
                 errors.append(f"{cand}: {e}")
+        if not cfg.get("allow_sim_fallback", True):
+            raise SourceError("No Kinect found. " + " | ".join(errors))
         src = open_source("sim", cfg, scene)
         src.error = "No Kinect found, using simulator. " + " | ".join(errors)
         return src

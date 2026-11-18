@@ -495,3 +495,48 @@ def test_camera_stream_only_when_watched(tmp_path, cfg):
         app.set_rgb_viewers(0)
     finally:
         app.stop()
+
+
+@pytest.mark.skipif(not find_bridge(), reason="echosense-kinect2 bridge not built")
+def test_reconnects_after_sensor_drops(tmp_path, cfg):
+    """Kill the sensor driver process mid-stream (like a USB reset): the app must notice, warn,
+    reopen the sensor by itself and resume, without ever switching to fake data."""
+    from echosense.app import EchoSense
+
+    cfg["speech"]["engine"] = "none"
+    cfg["reconnect"] = {"stall_s": 0.8, "retry_s": 0.5}
+    app = EchoSense(cfg, source="kinect2-fake", audio="none", settings_path=str(tmp_path / "s.json"))
+    kinds = []
+    app.event_listeners.append(lambda e: kinds.append((e["kind"], e["text"])))
+    app.start()
+    try:
+        time.sleep(1.5)
+        first = app.source
+        assert first.kind == "kinect2" and app.health.state == "ok"
+        first.proc.kill()  # the "USB" goes away
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and not any("reconnected" in t for _, t in kinds):
+            time.sleep(0.2)
+        assert any("reconnecting" in t for _, t in kinds)
+        assert any("reconnected" in t for _, t in kinds)
+        assert app.source is not first and app.source.kind == "kinect2" and app.source.running
+        time.sleep(1.0)
+        assert app.health.state == "ok"
+    finally:
+        app.stop()
+
+
+def test_device_profile_never_falls_back_to_simulator(tmp_path):
+    from echosense.app import EchoSense
+
+    cfg = load_config(profile="orangepi5")
+    cfg["speech"]["engine"] = "none"
+    cfg["sensor"]["kinect2_bridge"] = "/nonexistent"
+    app = EchoSense(cfg, source="kinect1-missing", audio="none", settings_path=str(tmp_path / "s.json"))
+    app.start()
+    try:
+        time.sleep(1.5)
+        assert app.source.kind == "none"  # no sensor: keep searching and warn, never fake depth
+        assert app.health.state in ("starting", "no_data")
+    finally:
+        app.stop()

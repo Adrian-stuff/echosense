@@ -22,6 +22,10 @@ WEB_DIR = PACKAGE_DIR / "web"
 
 DEFAULTS: dict = {
     "device_profile": "dev",
+    # laptop: fall back to the simulator when no Kinect is found. The device profiles turn this off:
+    # on the real device fake depth must never drive the cues (it keeps searching instead)
+    "allow_sim_fallback": True,
+    "reconnect": {"stall_s": 1.5, "retry_s": 2.0},
     "sensor": {
         # Microsoft Kinect v2 depth (IR) camera, figures from the proposal
         # (Kurillo et al., 2022) and libfreenect2 factory intrinsics.

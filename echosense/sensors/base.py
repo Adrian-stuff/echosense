@@ -80,3 +80,18 @@ class DepthSource:
 
     def info(self) -> dict:
         return {"kind": self.kind, "label": self.label, "intrinsics": self.intrinsics, "error": self.error}
+
+
+class NoSensor(DepthSource):
+    """Stands in while no depth sensor is connected: produces no frames, so the health monitor raises
+    "Sensor not responding" while the app keeps looking for the Kinect. Used instead of the
+    simulator on the real device, where fake depth would be dangerous."""
+
+    kind = "none"
+    label = "No sensor (searching)"
+
+    def __init__(self, wanted: str = "auto", reason: str = ""):
+        super().__init__()
+        self.wanted = wanted
+        self.error = reason or None
+        self.intrinsics = {"width": 512, "height": 424, "fx": 365.456, "fy": 365.456, "cx": 254.878, "cy": 205.395}
