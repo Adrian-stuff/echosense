@@ -28,6 +28,10 @@ cue map, the device buttons, simulator controls, fitting/calibration, training m
 The four modules match the proposal's System Architecture (section 7-D). The code is in
 `echosense/sensors`, `echosense/processing`, `echosense/audio`, and `echosense/device` + `echosense/app.py`.
 
+## System flowchart
+
+See the [whole-system flowchart](docs/system-flowchart.md) for sensing, spatial audio, authentication, supervised training, child fitting, footage, storage, and recovery. An editable [Mermaid overview](docs/system-flowchart.mmd) is also included. For report figures, see the [context diagram, Level 1 data-flow diagram, and comparison table](docs/system-diagrams.md).
+
 ## Parent dashboard
 
 Open **[Parent space](http://localhost:8080/parents)** alongside the existing console to view the sensor, record clips and snapshots, annotate footage, and save supervised stationary training sessions. Footage, profiles, and goals stay in the current browser; confirmed training results and observations are also saved on the device. ZIP backup/restore keeps footage linked to practice history. The dashboard labels simulated readings and supports depth-only devices. See [the parent dashboard guide](docs/parent-dashboard.md) for storage limits and recommended next steps.

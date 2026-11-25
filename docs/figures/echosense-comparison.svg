@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1520" height="645" viewBox="0 0 1520 645" role="img" aria-labelledby="title desc">
+<title id="title">Comparison of EchoSense and related assistive tools</title><desc id="desc">Table comparing purpose, interface, obstacle sensing, feedback, route guidance, practice, and caregiver records for five tools. ND means not documented in the cited materials.</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L10 4 L0 8 Z" fill="#20242a"/></marker></defs>
+<rect width="1520" height="645" fill="white"/>
+<text x="48" y="49" text-anchor="start" font-family="Georgia,serif" font-size="24" font-weight="700" font-style="normal" fill="#20242a">Table 1</text>
+<text x="48" y="88" text-anchor="start" font-family="Georgia,serif" font-size="30" font-weight="400" font-style="italic" fill="#20242a">Comparison of EchoSense and related assistive tools</text>
+<rect x="38" y="120" width="159" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
+<text x="50" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">System</text>
+<rect x="197" y="120" width="191" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
+<text x="209" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Primary focus</text>
+<rect x="388" y="120" width="203" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
+<text x="400" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Form and interface</text>
+<rect x="591" y="120" width="193" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
+<text x="603" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Obstacle sensing</text>
+<rect x="784" y="120" width="206" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
+<text x="796" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">User feedback</text>
+<rect x="990" y="120" width="139" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
+<text x="1002" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Route guidance</text>
+<rect x="1129" y="120" width="166" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
+<text x="1141" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Practice tracking</text>
+<rect x="1295" y="120" width="187" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
+<text x="1307" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Caregiver records</text>
+<rect x="38" y="166" width="159" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
+<text x="50" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">EchoSense</text>
+<text x="50" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">prototype</text>
+<rect x="197" y="166" width="191" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
+<text x="209" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Obstacle assistance</text>
+<text x="209" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and supervised practice</text>
+<rect x="388" y="166" width="203" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
+<text x="400" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Chest-mounted Kinect,</text>
+<text x="400" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">local web dashboard</text>
+<rect x="591" y="166" width="193" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
+<text x="603" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Depth-based obstacle</text>
+<text x="603" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and drop-off cues</text>
+<rect x="784" y="166" width="206" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
+<text x="796" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Spatial tones and</text>
+<text x="796" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">spoken alerts</text>
+<rect x="990" y="166" width="139" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
+<text x="1002" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">No</text>
+<rect x="1129" y="166" width="166" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
+<text x="1141" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Direction trials,</text>
+<text x="1141" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">goals and reports</text>
+<rect x="1295" y="166" width="187" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
+<text x="1307" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Local clips, notes</text>
+<text x="1307" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and ZIP backup</text>
+<rect x="38" y="232" width="159" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="50" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">NOA by</text>
+<text x="50" y="279" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">biped.ai [1]</text>
+<rect x="197" y="232" width="191" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="209" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Wearable mobility</text>
+<text x="209" y="279" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">assistance</text>
+<rect x="388" y="232" width="203" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="400" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Camera-equipped</text>
+<text x="400" y="279" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">wearable and headphones</text>
+<rect x="591" y="232" width="193" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="603" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Camera-based</text>
+<text x="603" y="279" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">obstacle detection</text>
+<rect x="784" y="232" width="206" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="796" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Spatial obstacle sounds</text>
+<text x="796" y="279" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and voice guidance</text>
+<rect x="990" y="232" width="139" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1002" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">GPS directions</text>
+<rect x="1129" y="232" width="166" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1141" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
+<rect x="1295" y="232" width="187" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1307" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
+<rect x="38" y="298" width="159" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="50" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">WeWALK</text>
+<text x="50" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">Smart Cane 2 [2]</text>
+<rect x="197" y="298" width="191" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="209" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Smart cane mobility</text>
+<text x="209" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and wayfinding</text>
+<rect x="388" y="298" width="203" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="400" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Electronic white cane</text>
+<text x="400" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and companion app</text>
+<rect x="591" y="298" width="193" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="603" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Above-chest sensor</text>
+<text x="603" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">detection</text>
+<rect x="784" y="298" width="206" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="796" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Audio and</text>
+<text x="796" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">vibration alerts</text>
+<rect x="990" y="298" width="139" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1002" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Via companion</text>
+<text x="1002" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">app</text>
+<rect x="1129" y="298" width="166" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1141" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
+<rect x="1295" y="298" width="187" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1307" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
+<rect x="38" y="364" width="159" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="50" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">Microsoft</text>
+<text x="50" y="411" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">Seeing AI [3]</text>
+<rect x="197" y="364" width="191" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="209" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Text reading and</text>
+<text x="209" y="411" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">scene description</text>
+<rect x="388" y="364" width="203" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="400" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Phone camera app</text>
+<rect x="591" y="364" width="193" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="603" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND for real-time</text>
+<text x="603" y="411" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">obstacle alerts</text>
+<rect x="784" y="364" width="206" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="796" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Spoken text and</text>
+<text x="796" y="411" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">scene descriptions</text>
+<rect x="990" y="364" width="139" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1002" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
+<rect x="1129" y="364" width="166" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1141" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
+<rect x="1295" y="364" width="187" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1307" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
+<rect x="38" y="430" width="159" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="50" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">Lazarillo [4]</text>
+<rect x="197" y="430" width="191" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="209" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Accessible wayfinding</text>
+<text x="209" y="477" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and exploration</text>
+<rect x="388" y="430" width="203" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="400" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Phone GPS app</text>
+<rect x="591" y="430" width="193" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="603" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND for nearby</text>
+<text x="603" y="477" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">obstacle alerts</text>
+<rect x="784" y="430" width="206" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="796" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Spoken directions and</text>
+<text x="796" y="477" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">place announcements</text>
+<rect x="990" y="430" width="139" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1002" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Turn-by-turn</text>
+<text x="1002" y="477" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">routes</text>
+<rect x="1129" y="430" width="166" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1141" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
+<rect x="1295" y="430" width="187" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
+<text x="1307" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
+<text x="38" y="528" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="400" font-style="normal" fill="#4b545e">ND = not documented in the cited materials. This comparison describes features and does not rank detection performance.</text>
+<text x="38" y="559" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#4b545e">[1] biped.ai NOA product page and mobility guide.  [2] WeWALK Smart Cane 2 manufacturer manual.</text>
+<text x="38" y="584" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#4b545e">[3] Microsoft Seeing AI product overview.  [4] Lazarillo official app overview.</text>
+<text x="38" y="620" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#4b545e">EchoSense entries describe the implemented prototype. Source links accompany the editable table.</text>
+</svg>

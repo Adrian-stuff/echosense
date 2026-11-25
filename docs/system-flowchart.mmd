@@ -1,0 +1,100 @@
+flowchart TB
+    START(["Start EchoSense"]) --> BOOT["Load configuration, saved fitting, and device settings"]
+    BOOT --> DEVICE["Run on Orange Pi, laptop, or Docker"]
+    DEVICE --> SOURCE{"Select depth source"}
+    SOURCE --> KINECT["Kinect v1 or Kinect v2"]
+    SOURCE --> SIM["Simulator or recorded-depth replay"]
+
+    subgraph SENSING["Sensing and perception"]
+        FRAMES["Capture depth frames and available RGB"] --> PROCESS["Filter depth; project points; estimate floor and gravity"]
+        PROCESS --> DETECT["Classify and cluster obstacles and drop-offs"]
+        DETECT --> TRACK["Track, recognize, filter the walking corridor, and prioritize"]
+        PROCESS -.-> MAP["Optional local world map"]
+        FRAMES --> HEALTH["Monitor sensor health, frame age, and performance"]
+    end
+    KINECT --> FRAMES
+    SIM --> FRAMES
+
+    subgraph ASSISTANCE["Audio assistance"]
+        SELECT{"Select cues using power, health, and training state"}
+        LIVE["Live obstacle cues"]
+        VIRTUAL["Supervised virtual training target"]
+        QUIET["No obstacle cues when output is disabled or sensing cannot support them"]
+        AUDIO["Spatial audio synthesis, speech, mixing, and limiter"]
+        CHILD["Child hears cues through open-ear or bone-conduction headset"]
+        SELECT -->|"Assistive mode"| LIVE
+        SELECT -->|"Powered training mode"| VIRTUAL
+        SELECT -->|"Output unavailable"| QUIET
+        LIVE --> AUDIO
+        VIRTUAL --> AUDIO
+        QUIET --> AUDIO
+        AUDIO --> CHILD
+    end
+    TRACK --> SELECT
+    HEALTH --> SELECT
+    HEALTH -->|"Warnings and fault announcements"| AUDIO
+    HEALTH --> RECONNECT["Watchdog retries a lost physical sensor"]
+    RECONNECT -.-> KINECT
+
+    subgraph ACCESS["Parent and caregiver access"]
+        PERSON["Parent or caregiver"] --> SIGNIN["First-owner setup, invited account, or login"]
+        SIGNIN --> AUTH["Validate session, request origin, CSRF, and role permissions"]
+        AUTH --> WEB["Authenticated HTTP API and WebSocket server"]
+        WEB <--> APP["Parent dashboard or advanced device console"]
+    end
+    DEVICE --> WEB
+    FRAMES -->|"Depth and supported color view"| WEB
+    TRACK -->|"Detections and cues"| WEB
+    MAP --> WEB
+    HEALTH -->|"Status and performance"| WEB
+    AUDIO -->|"Optional browser listening"| WEB
+
+    subgraph WORKFLOWS["Parent workflows"]
+        FIT["Measure child; calibrate mount; preview coverage; save fitting"]
+        PRACTICE["Start, pause, resume, and finish supervised practice"]
+        SUPERVISOR["Device owns session, checks supervision, and acknowledges results"]
+        CAPTURE["Explicitly record a clip or snapshot; add notes and session link"]
+        REPORT["Review goals, sound errors, practice consistency, observations, and CSV reports"]
+        ACCOUNTS["Owner invites or revokes viewers, trainers, and device managers"]
+        LOCK["On detected expiry or revocation: hide private content and preserve work"]
+    end
+    APP --> FIT
+    FIT --> SETTINGS[("Device settings JSON")]
+    SETTINGS -.-> PROCESS
+    SETTINGS -.-> AUDIO
+    SETTINGS -.-> SELECT
+    APP --> PRACTICE
+    PRACTICE <--> SUPERVISOR
+    SUPERVISOR -->|"Select or stop virtual sounds"| SELECT
+    SUPERVISOR -->|"Disconnect, timeout, or failure"| PAUSE["Pause virtual training; return to normal cue selection; require explicit resume"]
+    PAUSE --> SELECT
+    PAUSE -.-> PRACTICE
+    APP --> CAPTURE
+    APP --> REPORT
+    APP --> ACCOUNTS
+    ACCOUNTS --> AUTH
+    AUTH -->|"Session ends"| LOCK
+    LOCK -->|"Sign in again to unlock"| SIGNIN
+
+    subgraph STORAGE["Storage and recovery"]
+        DB[("Device SQLite: accounts, hashed passwords, sessions, invitations, confirmed practice, observations")]
+        LOCAL[("Browser IndexedDB: footage, profile, goals, cached history, clip notes and links")]
+        DRAFT[("Browser localStorage: small recovery drafts")]
+        RECOVERY["If media cannot be saved: retain in the open page and offer downloads"]
+        ZIP["Portable ZIP backup or validated, duplicate-safe restore"]
+        LOGS[("Optional device logs and raw-depth recordings")]
+    end
+    AUTH <--> DB
+    SUPERVISOR <--> DB
+    WEB -->|"Practice history"| REPORT
+    CAPTURE --> LOCAL
+    CAPTURE -->|"Storage failure"| RECOVERY
+    APP <--> LOCAL
+    LOCAL --> REPORT
+    LOCK --> DRAFT
+    LOCK -->|"Stop and save any recording"| CAPTURE
+    LOCAL <--> ZIP
+    RECOVERY --> ZIP
+    FRAMES -.->|"Optional raw-depth recording"| LOGS
+    TRACK -.->|"Optional session logging"| LOGS
+    CONTROLS["Physical GPIO buttons"] -->|"Local device actions; no browser login required"| SELECT
