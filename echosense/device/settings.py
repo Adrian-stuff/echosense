@@ -10,6 +10,7 @@ from typing import Optional
 
 RANGES = ("near", "medium", "far")
 MODES = ("continuous", "warning")
+SENSITIVITIES = ("low", "normal", "high")
 
 
 @dataclass
@@ -19,6 +20,7 @@ class UserSettings:
     range: str = "medium"  # near | medium | far
     mode: str = "continuous"  # continuous | warning
     warning_distance: float = 1.2
+    sensitivity: str = "normal"  # low | normal | high: evidence needed before an obstacle is cued
     profile: str = "tone"  # tone | click | soft
     report_off_path: bool = False
     logging: bool = False  # session logging is for the evaluation period only
@@ -27,6 +29,9 @@ class UserSettings:
     # device fitting (caregiver): chest-mount height and tilt; None = profile default
     mount_height: Optional[float] = None
     mount_pitch: Optional[float] = None
+    head_height: Optional[float] = None
+    ear_height: Optional[float] = None
+    fitting_checked: bool = False
 
 
 class SettingsStore:
@@ -54,6 +59,8 @@ class SettingsStore:
             s.range = "medium"
         if s.mode not in MODES:
             s.mode = "continuous"
+        if s.sensitivity not in SENSITIVITIES:
+            s.sensitivity = "normal"
 
     def save(self):
         with self._lock:

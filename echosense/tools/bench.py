@@ -68,7 +68,7 @@ def run(args):
     print(f"\nEcho-Sense pipeline benchmark  ({args.frames} frames, scene {args.scene}, profile {cfg['device_profile']})")
     print(f"host  {platform.node()}  {platform.system()} {platform.machine()}  cpus={os.cpu_count()}  quota={cpu_quota()}"
           f"  python {platform.python_version()}  numpy {np.__version__}")
-    print(f"stride {cfg['processing']['stride']}  confirm_frames {cfg['processing']['confirm_frames']}  "
+    print(f"stride {cfg['processing']['stride']}  confirm_frames {cfg['processing']['confirm_frames']} (+sensitivity)  "
           f"audio block {a['block_size']} @ {a['sample_rate']} Hz\n")
     print(f"{'stage':<28}{'mean':>8}{'p95':>8}{'max':>8}   ms")
     for name, v in (("simulated sensor (not on device)", t_sim), ("processing", t_proc), ("audio render / frame", t_audio)):
@@ -77,7 +77,8 @@ def run(args):
     print(f"\nCPU share for one {cfg['sensor']['fps']} fps stream: {load * 100:.0f}% of one core "
           f"(Kinect decoding by libfreenect2 comes on top of this on the device)")
 
-    cf = cfg["processing"]["confirm_frames"]
+    from ..processing.pipeline import DepthProcessor as _DP
+    cf = _DP(cfg).frames_to_confirm(cfg["sensor"]["fps"])  # includes the default sensitivity level
     budget = [
         ("sensor exposure + transfer (assumed 1 frame)", period * 1000),
         (f"confirmation ({cf - 1} more frame{'s' if cf != 2 else ''})", (cf - 1) * period * 1000),

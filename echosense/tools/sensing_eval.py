@@ -50,6 +50,7 @@ CASES = [
 
 def _run_static(cfg, sc, d, kind, sun, seeds, frames):
     det, errs, jit, kinds = [], [], [], []
+    cf = DepthProcessor(cfg).frames_to_confirm(30)  # includes the sensitivity level's extra frames
     for seed in range(seeds):
         sim = SimulatedKinect(cfg, sc, seed=100 + seed)
         sim.sun, sim.head_bob = sun, False
@@ -60,13 +61,13 @@ def _run_static(cfg, sc, d, kind, sun, seeds, frames):
             depth, _ = sim.capture(f / 30)
             res = proc.process(DepthFrame(depth, f / 30, f + 1, sim.intrinsics, "sim"), 4.5, True)
             cand = [o for o in res.reported if abs(o["r"] - d) < 0.6 and (kind is None or o["kind"] == kind or kind == "low" and o["kind"] == "body")]
-            if f >= cfg["processing"]["confirm_frames"] + 1:
+            if f >= cf + 1:
                 hit_frames += bool(cand)
                 if cand:
                     best = min(cand, key=lambda o: abs(o["r"] - d))
                     rs.append(best["r"])
                     kinds.append(best["kind"])
-        n_eval = frames - cfg["processing"]["confirm_frames"] - 1
+        n_eval = frames - cf - 1
         det.append(hit_frames / n_eval)
         errs += [abs(r - d) for r in rs]
         if len(rs) > 3:

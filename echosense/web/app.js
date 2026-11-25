@@ -22,6 +22,7 @@ let hello = null;
 let st = null;
 let ws = null;
 let view = 'follow';
+let supervision = null, supervising = false;
 
 // ------------------------------------------------------------------ socket
 function connect() {
@@ -29,7 +30,15 @@ function connect() {
   ws.binaryType = 'arraybuffer';
   ws.onmessage = (ev) => (typeof ev.data === 'string' ? onJson(JSON.parse(ev.data)) : onBinary(ev.data));
   ws.onopen = () => { if (audio.on) send({ t: 'audio', on: true }); if (cam.on) send({ t: 'rgb', on: true }); };
-  ws.onclose = () => { pill('p-health', 'offline', 'bad'); setTimeout(connect, 1200); };
+  ws.onclose = async () => {
+    pill('p-health', 'offline', 'bad');
+    try {
+      const response = await fetch('/api/auth/status', { cache: 'no-store' });
+      const account = await response.json();
+      if (!account.authenticated) { location.replace('/login?reason=expired'); return; }
+    } catch { /* Device unavailable; retry the connection. */ }
+    setTimeout(connect, 1200);
+  };
 }
 const send = (o) => ws && ws.readyState === 1 && ws.send(JSON.stringify(o));
 const dec = new TextDecoder();
@@ -53,6 +62,8 @@ function onJson(m) {
   if (m.type === 'hello') onHello(m);
   else if (m.type === 'event') addEvent(m);
   else if (m.type === 'perf') onPerf(m);
+  else if (m.type === 'training_ack') { supervision = m.session; supervising = m.session.status === 'active'; }
+  else if (m.type === 'supervision') { supervision = m.session; if (supervision?.status !== 'active') supervising = false; }
 }
 
 // ------------------------------------------------------------ performance
@@ -238,6 +249,8 @@ const dctx = $('depth').getContext('2d');
 let dimg = null;
 
 function onFrame(s, depth) {
+  supervision = s.supervision || supervision;
+  if (supervision?.status !== 'active') supervising = false;
   st = s;
   const pose = s.pose || { x: 0, z: 0, yaw: 0, pitch: s.mount.pitch, height: s.mount.height, body_x: 0, body_z: -0.12 };
   bodyGroup.position.set(pose.x, 0, -pose.z);
@@ -255,6 +268,7 @@ function onFrame(s, depth) {
   updateBoxes(s);
   updateFrustum(s, pose);
   drawRadar(s);
+  drawWorldMap(s);
   updatePanels(s);
 }
 
@@ -435,6 +449,73 @@ function drawRadar(s) {
   g.fillStyle = '#3dd6c4'; g.beginPath(); g.arc(ox, oy, 4, 0, 2 * Math.PI); g.fill();
 }
 
+// -------------------------------------------------------------- world map
+// North-up map around the user (processing/worldmap.py). The map image arrives about twice a second
+// (one byte per 10 cm cell: category << 6 | confidence); pose and trails arrive with every frame.
+const wmCtx = $('worldmap').getContext('2d');
+const WM_COL = [null, [69, 200, 245], [255, 176, 32], [169, 139, 255]]; // low, body, drop
+const WM_STATUS = {
+  starting: ['starting', ''],
+  mapping: ['tracking', 'ok'],
+  weak: ['weak: little to line up with, partly dead reckoning', 'warn'],
+  lost: ['lost: nothing in view, dead reckoning', 'bad'],
+};
+let wmImg = null;
+function drawWorldMap(s) {
+  const w = s.world, card = $('map-card');
+  card.hidden = !w;
+  if (!w) return;
+  if (w.data) {
+    const raw = atob(w.data);
+    const off = wmImg?.canvas || document.createElement('canvas');
+    off.width = w.w; off.height = w.h;
+    const c = off.getContext('2d');
+    const im = c.createImageData(w.w, w.h);
+    for (let j = 0; j < w.h; j++) {
+      for (let i = 0; i < w.w; i++) {
+        const v = raw.charCodeAt(j * w.w + i);
+        if (!v) continue;
+        const col = WM_COL[v >> 6], k = ((w.h - 1 - j) * w.w + i) * 4; // rows run +z (forward) = up
+        im.data[k] = col[0]; im.data[k + 1] = col[1]; im.data[k + 2] = col[2];
+        im.data[k + 3] = 70 + 185 * ((v & 63) / 63);
+      }
+    }
+    c.putImageData(im, 0, 0);
+    wmImg = { canvas: off, x0: w.x0, z0: w.z0, cell: w.cell, w: w.w, h: w.h };
+  }
+  const cv = $('worldmap'), g = wmCtx, W = cv.width, H = cv.height;
+  const k = W / 10; // 10 m across
+  const sx = (x) => W / 2 + (x - w.x) * k, sy = (z) => H / 2 - (z - w.z) * k;
+  g.clearRect(0, 0, W, H);
+  g.strokeStyle = '#141b24'; g.lineWidth = 1;
+  for (let m = Math.ceil(w.x - 6); m <= w.x + 6; m++) { g.beginPath(); g.moveTo(sx(m), 0); g.lineTo(sx(m), H); g.stroke(); }
+  for (let m = Math.ceil(w.z - 6); m <= w.z + 6; m++) { g.beginPath(); g.moveTo(0, sy(m)); g.lineTo(W, sy(m)); g.stroke(); }
+  if (wmImg) {
+    g.imageSmoothingEnabled = false;
+    g.drawImage(wmImg.canvas, sx(wmImg.x0), sy(wmImg.z0 + wmImg.h * wmImg.cell), wmImg.w * wmImg.cell * k, wmImg.h * wmImg.cell * k);
+  }
+  const path = (pts, style, dash) => {
+    if (!pts || pts.length < 2) return;
+    g.strokeStyle = style; g.lineWidth = 2; g.setLineDash(dash);
+    g.beginPath(); pts.forEach(([x, z], i) => (i ? g.lineTo(sx(x), sy(z)) : g.moveTo(sx(x), sy(z)))); g.stroke();
+    g.setLineDash([]);
+  };
+  path(w.truth, 'rgba(135,150,168,0.8)', [4, 4]);
+  path(w.trail, 'rgba(61,214,196,0.9)', []);
+  const a = w.yaw * DEG, fx = Math.sin(a), fz = Math.cos(a);
+  g.fillStyle = '#3dd6c4';
+  g.beginPath();
+  g.moveTo(W / 2 + fx * 11, H / 2 - fz * 11);
+  g.lineTo(W / 2 - fx * 5 + fz * 6, H / 2 + fz * 5 + fx * 6);
+  g.lineTo(W / 2 - fx * 5 - fz * 6, H / 2 + fz * 5 - fx * 6);
+  g.closePath(); g.fill();
+  $('wm-truth-key').hidden = !w.truth;
+  const [txt, cls] = WM_STATUS[w.status] || [w.status, ''];
+  const err = w.err_pos != null ? ` · off truth ${(w.err_pos * 100).toFixed(0)} cm, ${w.err_yaw.toFixed(1)}°` : '';
+  $('map-meta').innerHTML = `<span class="${cls}">${txt}</span> · ${w.points} pts · walked ${w.travelled.toFixed(1)} m${err}`;
+}
+$('map-reset').onclick = () => { wmImg = null; send({ t: 'map', cmd: 'reset' }); };
+
 // ----------------------------------------------------------------- panels
 function pill(id, text, cls = '') { const el = $(id); el.textContent = text; el.className = 'pill ' + cls; }
 const sideTxt = (az) => (Math.abs(az) < 4 ? 'ahead' : `${Math.abs(az).toFixed(0)}° ${az > 0 ? 'right' : 'left'}`);
@@ -493,6 +574,7 @@ function updatePanels(s) {
   syncSlider('c-warn', set.warning_distance, 'o-warn', (v) => `${(+v).toFixed(1)} m`);
   syncSlider('s-batt', s.battery.percent, 'o-batt', (v) => `${(+v).toFixed(0)}%`);
   document.querySelectorAll('#zone button').forEach((b) => b.classList.toggle('on', (b.dataset.zone === 'fov') === !!set.report_off_path));
+  document.querySelectorAll('#sens button').forEach((b) => b.classList.toggle('on', b.dataset.sens === (set.sensitivity || 'normal')));
   const cv = s.coverage;
   if (cv) {
     const m = (v, gapText) => (v == null ? `<span class="gap">${gapText}</span>` : `from ${v.toFixed(2)} m`);
@@ -503,6 +585,7 @@ function updatePanels(s) {
       [`Head height (${cv.head_height} m)`, m(cv.head_from, 'not covered (tilt up)')],
       ['Full corridor width', m(cv.corridor_from, 'beyond range')],
       ['View width at 2 m', `${cv.width_at_2m.toFixed(2)} m`],
+      ['Accelerometer', gravityText(s.gravity, s.ground)],
     ].map(([a, b]) => `<dt>${a}</dt><dd>${b}</dd>`).join('') +
       `<dt></dt><dd class="meta">Closer than these distances the sensor is blind at that height.</dd>`;
   }
@@ -516,7 +599,7 @@ function updatePanels(s) {
   $('log-path').textContent = s.logging ? s.log_path : '';
 
   const tr = s.training;
-  $('t-start').textContent = tr.active ? 'Stop' : 'Start';
+  $('t-start').textContent = tr.active ? 'Finish session' : supervision?.status === 'paused' ? 'Resume session' : 'Start';
   $('t-start').classList.toggle('on', tr.active);
   const sm = tr.summary;
   $('t-summary').textContent = sm.trials ? `${sm.trials} trial${sm.trials > 1 ? 's' : ''} · mean angular error ${sm.mae_deg}°` : 'No trials yet';
@@ -524,6 +607,17 @@ function updatePanels(s) {
 }
 
 const editing = new Set();
+function gravityText(g, ground) {
+  if (!g || g.status === 'none') {
+    if (g && g.device && g.device.startsWith('unavailable')) return `<span class="gap">${g.device.replace('unavailable: ', 'not available: ')}</span>`;
+    return '—';
+  }
+  if (g.status === 'learning') return 'learning its axes from the floor (keep the floor in view, tilted a little)';
+  const a = g.angles;
+  const tilt = a ? `tilt ${a.pitch.toFixed(1)}°${a.roll != null ? ` · roll ${a.roll.toFixed(1)}°` : ''}` : 'no reading';
+  return `${tilt}${ground && ground.source === 'gravity' ? ' · <b>floor from gravity</b> (none in view)' : ''}`;
+}
+
 function syncSlider(id, val, outId, fmt) {
   const el = $(id);
   if (!editing.has(id)) el.value = val;
@@ -569,8 +663,8 @@ for (const a of [-60, -45, -30, -15, 0, 15, 30, 45, 60]) {
 }
 $('t-r').oninput = () => { $('o-tr').textContent = `${$('t-r').value} m`; send({ t: 'training', cmd: 'target', r: +$('t-r').value }); };
 $('t-kind').onchange = () => send({ t: 'training', cmd: 'target', kind: $('t-kind').value });
-$('t-start').onclick = () => send({ t: 'training', cmd: st && st.training.active ? 'stop' : 'start' });
-$('t-blind').onclick = () => { if (!st?.training.active) send({ t: 'training', cmd: 'start' }); lastResponse = null; send({ t: 'training', cmd: 'random' }); };
+$('t-start').onclick = () => send({ t: 'training', cmd: st?.training.active ? 'finish' : supervision?.status === 'paused' ? 'resume' : 'start', session_id: supervision?.id });
+$('t-blind').onclick = () => { if (!st?.training.active) send({ t: 'training', cmd: supervision?.status === 'paused' ? 'resume' : 'start', session_id: supervision?.id }); lastResponse = null; send({ t: 'training', cmd: 'random' }); };
 
 // --------------------------------------------------------------- hello
 function onHello(h) {
@@ -708,6 +802,7 @@ $('s-sun').oninput = (e) => { $('o-sun').textContent = e.target.value; send({ t:
 $('s-reset').onclick = () => send({ t: 'sim', key: 'reset' });
 $('m-cal').onclick = () => send({ t: 'setting', key: 'calibrate_mount' });
 document.querySelectorAll('#zone button').forEach((b) => (b.onclick = () => send({ t: 'setting', key: 'report_off_path', value: b.dataset.zone === 'fov' })));
+document.querySelectorAll('#sens button').forEach((b) => (b.onclick = () => send({ t: 'setting', key: 'sensitivity', value: b.dataset.sens })));
 $('preset').onchange = () => { toast('Switching simulated sensor…'); send({ t: 'sim', key: 'sensor_preset', value: $('preset').value }); };
 $('t-fullres').onchange = (e) => send({ t: 'viewer', stride: e.target.checked ? 1 : 0 });
 $('c-near').onchange = (e) => send({ t: 'setting', key: 'near_mode', value: e.target.checked });
@@ -871,3 +966,12 @@ function animate() {
 }
 animate();
 connect();
+
+// Browser supervision is an explicit lease; the device restores live cues on expiry.
+setInterval(() => {
+  if (supervising && !document.hidden && supervision?.status === 'active')
+    send({ t: 'training', cmd: 'heartbeat', session_id: supervision.id });
+}, 2000);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && supervising) send({ t: 'training', cmd: 'pause', session_id: supervision?.id });
+});

@@ -51,7 +51,7 @@ def _trial(job):
 
     cfg, d, az, material, light, sun, reps, seed = job
     period = 1.0 / cfg["sensor"]["fps"]
-    frames = cfg["processing"]["confirm_frames"] + 1
+    frames = DepthProcessor(cfg).frames_to_confirm(cfg["sensor"]["fps"]) + 1
     scene = lab_scene(d, az, material) if d is not None else lab_scene(None, 0, material)
     sim = SimulatedKinect(cfg, scene, seed=seed)
     sim.sun = sun
@@ -133,7 +133,9 @@ def report(rows, cfg, reps, mats, lights) -> str:
     fp = 100 * sum(r["false_positive"] for r in emp) / max(1, len(emp))
     proc = statistics.mean(r["process_ms"] for r in rows)
     period = 1000 / cfg["sensor"]["fps"]
-    latency = period + (cfg["processing"]["confirm_frames"] - 1) * period + proc + 1000 * cfg["audio"]["block_size"] / cfg["audio"]["sample_rate"] + 10
+    from ..processing.pipeline import DepthProcessor
+    cf = DepthProcessor(cfg).frames_to_confirm(cfg["sensor"]["fps"])
+    latency = period + (cf - 1) * period + proc + 1000 * cfg["audio"]["block_size"] / cfg["audio"]["sample_rate"] + 10
     ok = lambda b: "PASS" if b else "FAIL"  # noqa: E731
     lines = [
         "# Echo-Sense technical performance protocol (simulation)", "",

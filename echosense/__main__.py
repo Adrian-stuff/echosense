@@ -94,6 +94,28 @@ def cmd_info(args):
     print(f"TTS         {Speech.detect_backend()}")
 
 
+def cmd_reset_password(args):
+    """Recovery requires access to the device's operating-system account."""
+    import getpass
+    import os
+    from pathlib import Path
+    from .auth import AuthStore
+    cfg = load_config(args.config, args.profile)
+    path = args.auth_db or os.environ.get("ECHOSENSE_AUTH_DB") or str(
+        Path(cfg["paths"]["settings"]).expanduser().parent / "accounts.sqlite3")
+    store = AuthStore(path)
+    if not store.has_account():
+        raise SystemExit("No account found. Open /login on the running device to create one.")
+    password = getpass.getpass("New password (15–128 characters): ")
+    if password != getpass.getpass("Confirm new password: "):
+        raise SystemExit("Passwords do not match. Nothing changed.")
+    try:
+        store.reset_password(password)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from None
+    print("Password updated. All sessions have been signed out.")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="echosense", description="Echo-Sense assistive depth-to-3D-audio device software")
     ap.add_argument("--config", help="JSON file overriding the configuration")
@@ -142,13 +164,27 @@ def main(argv=None):
     e.add_argument("--preset", help="simulated sensor model (kinect_v2, azure_nfov, azure_wfov, realsense_d455)")
     e.set_defaults(fn=lambda a: __import__("echosense.tools.sensing_eval", fromlist=["run"]).run(a))
 
-    o = sub.add_parser("train-objects", help="train the depth-only object recogniser on simulator scenes")
+    w = sub.add_parser("eval-map", help="world map: scan-matching pose vs simulator truth on each scene's route")
+    w.add_argument("--seeds", type=int, default=1)
+    w.add_argument("--seconds", type=float, default=40.0, help="longest walk per route")
+    w.add_argument("--scene", help="one scene only (default: all)")
+    w.add_argument("--preset", help="simulated sensor model (kinect_v2, kinect_v1, ...)")
+    w.add_argument("--no-bob", action="store_true", help="walk without chest bob")
+    w.set_defaults(fn=lambda a: __import__("echosense.tools.map_eval", fromlist=["run"]).run(a))
+
+    o = sub.add_parser("train-objects",help="train the depth-only object recogniser on simulator scenes")
     o.add_argument("--scenes", type=int, default=2800)
     o.add_argument("--depth", type=int, default=9, help="decision tree depth")
+    o.add_argument("--trees", type=int, default=1, help="trees in a small random forest (1 = one tree)")
+    o.add_argument("--cache", help="JSON file to keep the generated training rows in (reused if it exists)")
     o.add_argument("--extra", help="CSV of real labelled feature rows to add")
     o.add_argument("--model", help="output model path (default: the shipped model)")
     o.add_argument("--out", default="reports")
     o.set_defaults(fn=lambda a: __import__("echosense.tools.train_objects", fromlist=["run"]).run(a))
+
+    recovery = sub.add_parser("reset-password", help="reset the parent password from this device's terminal")
+    recovery.add_argument("--auth-db", help="account database path (default beside device settings)")
+    recovery.set_defaults(fn=cmd_reset_password)
 
     i = sub.add_parser("info", help="show sensors / audio / TTS available here")
     i.set_defaults(fn=cmd_info)

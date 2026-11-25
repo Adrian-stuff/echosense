@@ -1,6 +1,7 @@
 """Echo-Sense test-suite. Runs on the laptop, in the Docker virtual Orange Pi, and on the board."""
 from __future__ import annotations
 
+import json
 import math
 import os
 import time
@@ -104,7 +105,7 @@ def test_no_false_positives_on_open_ground(cfg):
 def test_confirmation_suppresses_single_frame_detections(cfg):
     sim = SimulatedKinect(cfg, lab_scene(2.0, 0, "concrete"), seed=1)
     proc = DepthProcessor(cfg)
-    n = cfg["processing"]["confirm_frames"]
+    n = proc.confirm_frames
     for i in range(n):
         res = proc.process(DepthFrame(sim.capture(i / 30)[0], i / 30, i + 1, sim.intrinsics, "sim"), 4.0)
         assert bool(res.reported) == (i == n - 1)
@@ -407,11 +408,11 @@ def test_sensor_presets_and_coverage(cfg):
 
 # ------------------------------------------------------- object recognition / lite
 def test_object_model_is_small_and_fast():
-    from echosense.processing.objects import MODEL_PATH, ObjectRecognizer
+    from echosense.processing.objects import FEATURES, MODEL_PATH, ObjectRecognizer
 
     rec = ObjectRecognizer()
-    assert rec.available and MODEL_PATH.stat().st_size < 64 * 1024
-    x = np.zeros(15, np.float32)
+    assert rec.available and MODEL_PATH.stat().st_size < 256 * 1024
+    x = np.zeros(len(FEATURES), np.float32)
     t = time.perf_counter()
     for _ in range(1000):
         rec.proba(x)
@@ -540,3 +541,245 @@ def test_device_profile_never_falls_back_to_simulator(tmp_path):
         assert app.health.state in ("starting", "no_data")
     finally:
         app.stop()
+
+
+@pytest.mark.parametrize("height,pitch", [(0.75, -12.0), (1.0, -20.0), (1.4, -5.0), (0.8, 0.0)])
+def test_floor_found_when_mount_differs_from_settings(height, pitch):
+    """A Kinect on a desk, in the hand or strapped differently: the floor must still be the floor,
+    not one huge obstacle (or drop-off) that sounds all the time."""
+    cfg = load_config()
+    cfg["sim"]["sensor_preset"] = "kinect_v1"
+    sim = SimulatedKinect(cfg, "open_area", seed=3)
+    sim.mount_height, sim.mount_pitch, sim.head_bob = height, pitch, False
+    proc = DepthProcessor(cfg)  # still configured for 1.25 m, -10 deg
+    cued = 0
+    for i in range(30):
+        res = proc.process(DepthFrame(sim.capture(i / 30)[0], i / 30, i + 1, sim.intrinsics, "sim"), 2.5)
+        cued += bool(res.reported)
+    assert cued == 0
+    assert abs(res.ground["height"] - height) < 0.05 and abs(res.ground["pitch"] - pitch) < 1.5
+    g = proc.calibrate_floor()
+    assert abs(g["height"] - height) < 0.05 and abs(g["pitch"] - pitch) < 1.5
+
+
+def test_sensitivity_levels(cfg):
+    proc = DepthProcessor(cfg)
+    assert proc.sensitivity == "normal"
+    counts = {}
+    for level in ("high", "normal", "low"):
+        proc.set_sensitivity(level)
+        counts[level] = proc.confirm_frames
+    assert counts["high"] < counts["normal"] < counts["low"]
+    # an obstacle that is only seen in every other frame (flicker) is not confirmed at normal sensitivity
+    from echosense.processing.pipeline import Obstacle
+    blip = Obstacle("body", 2.0, 0.0, 0.0, 2.0, 0.2, 1.2, -0.2, 0.2, 1.95, 2.05, 200, True)
+    for level, expect in (("high", True), ("normal", False)):
+        proc = DepthProcessor(cfg)
+        proc.set_sensitivity(level)
+        for i in range(16):
+            proc._track([blip] if i % 2 == 0 else [], i / 30)
+        assert any(t.confirmed for t in proc.tracks) == expect, level
+    # but a steadily seen one is, at every level
+    for level in ("high", "normal", "low"):
+        cfg2 = load_config()
+        cfg2["default_sensitivity"] = level
+        _, _, res = run(cfg2, lab_scene(2.0, 0, "concrete"), frames=12)
+        assert any(abs(o["r"] - 2.0) < 0.1 for o in res.reported), level
+
+
+def test_sensitivity_setting_persists_and_limits_cues(tmp_path, cfg):
+    from echosense.app import EchoSense
+    app = EchoSense(cfg, source="sim", audio="none", settings_path=str(tmp_path / "s.json"))
+    assert app.processor.sensitivity == "normal"
+    app.set_setting("sensitivity", "low")
+    assert app.processor.sensitivity == "low" and app.processor.sens["max_cues"] == 1
+    assert SettingsStore(tmp_path / "s.json").s.sensitivity == "low"
+    app.set_setting("sensitivity", "bogus")
+    assert app.processor.sensitivity == "low"
+
+
+def test_announcement_not_repeated_when_track_is_refound(tmp_path, cfg):
+    from echosense.app import EchoSense
+    app = EchoSense(cfg, source="sim", audio="none", settings_path=str(tmp_path / "s.json"))
+    said = []
+    app.speech.say = lambda text, *a, **k: said.append(text)
+    person = {"label": "person", "label_conf": 0.9, "az": 0.0, "hits": 20}
+    app._auto_announce([{**person, "id": 1}], 10.0)
+    app._auto_announce([{**person, "id": 2}], 14.0)  # same person, new track id after a dropout
+    app._auto_announce([{**person, "id": 3, "hits": 3}], 30.0)  # not seen long enough yet
+    assert said == ["Person ahead."]
+    app._auto_announce([{**person, "id": 4}], 30.0)
+    assert len(said) == 2
+
+
+def test_parked_vehicle_top_is_not_an_overhang(cfg):
+    """The far end of a parked motorcycle's top hides the floor under it: that is not free space."""
+    moto = {"type": "box", "name": "m", "x": 0.2, "z": 3.3, "w": 1.9, "h": 1.1, "d": 0.7, "material": "metal"}
+    for z in (3.0, 3.3, 3.6, 4.2):
+        _, _, res = run(cfg, scene({**moto, "z": z}), frames=8)
+        assert not any(o["kind"] == "head" for o in res.reported), z
+
+
+def test_kind_and_path_changes_settle(cfg):
+    from echosense.processing.pipeline import Obstacle
+    proc = DepthProcessor(cfg)
+    body = Obstacle("body", 2.0, 0.0, 0.0, 2.0, 0.2, 1.2, -0.2, 0.2, 1.95, 2.05, 200, True)
+    low = Obstacle("low", 2.0, 0.0, 0.0, 2.0, 0.1, 0.4, -0.2, 0.2, 1.95, 2.05, 200, True)
+    for i in range(6):
+        proc._track([body], i / 30)
+    tr = proc.tracks[0]
+    proc._track([low], 6 / 30)
+    assert tr.kind == "body"  # one odd frame doesn't change the sound
+    proc._track([low], 7 / 30)
+    proc._track([low], 8 / 30)
+    assert tr.kind == "low"
+    off = Obstacle("body", 2.0, 0.0, 0.0, 2.0, 0.2, 1.2, -0.2, 0.2, 1.95, 2.05, 200, False)
+    proc._track([off], 9 / 30)
+    assert tr.in_path  # leaving the path takes a few frames...
+    on = Obstacle("body", 2.0, 0.0, 0.0, 2.0, 0.2, 1.2, -0.2, 0.2, 1.95, 2.05, 200, True)
+    for i in range(3):
+        proc._track([off], (10 + i) / 30)
+    assert not tr.in_path
+    proc._track([on], 13 / 30)
+    assert tr.in_path  # ...entering it is immediate
+
+
+def test_forest_model_roundtrip():
+    from echosense.processing.objects import FEATURES, Forest, load_model
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(400, len(FEATURES))).astype(np.float32)
+    y = (X[:, 0] > 0).astype(int) + 2 * (X[:, 3] > 0.5).astype(int)
+    f = Forest.fit(X, y, n_trees=5, max_depth=4)
+    g = load_model(json.loads(json.dumps(f.to_json())))
+    assert (g.predict(X) == f.predict(X)).mean() > 0.99 and (f.predict(X) == y).mean() > 0.9
+    assert abs(float(g.proba(X[0]).sum()) - 1.0) < 1e-3
+
+
+@pytest.mark.parametrize("signs", [(1.0, -1.0, 1.0), (-1.0, 1.0, -1.0), (1.0, -1.0, -1.0)])
+def test_accelerometer_axes_learned_from_floor(signs):
+    cfg = load_config()
+    cfg["sim"]["sensor_preset"] = "kinect_v1"
+    sim = SimulatedKinect(cfg, "open_area", seed=2)
+    sim.accel_signs, sim.mount_pitch = signs, -14.0
+    proc = DepthProcessor(cfg)
+    for i in range(45):
+        d, ex = sim.capture(i / 30)
+        proc.process(DepthFrame(d, i / 30, i + 1, sim.intrinsics, "sim", ex), 2.5)
+    assert proc.gravity.status() == "verified"
+    assert abs(proc.gravity.angles(44 / 30)["pitch"] - (-14.0)) < 1.5
+
+
+def test_gravity_keeps_heights_right_without_floor_in_view():
+    """Up close to a wall the floor is out of view. With the accelerometer the wall's height band
+    stays right; without it the estimate falls back to the configured mount after 2 s."""
+    wall = scene({"type": "box", "name": "wall", "x": 0, "z": 5.0, "w": 8, "h": 3, "d": 0.2, "material": "concrete"})
+    out = {}
+    for acc in (False, True):
+        cfg = load_config()
+        cfg["sim"]["sensor_preset"] = "kinect_v1"
+        sim = SimulatedKinect(cfg, wall, seed=3)
+        sim.accel, sim.mount_height, sim.mount_pitch, sim.head_bob = acc, 0.9, -4.0, False
+        proc = DepthProcessor(cfg)
+        for i in range(60):
+            d, ex = sim.capture(i / 30)
+            proc.process(DepthFrame(d, i / 30, i + 1, sim.intrinsics, "sim", ex), 2.5)
+        sim.z = 3.78  # 1 m from the wall
+        for i in range(60, 170):
+            d, ex = sim.capture(i / 30)
+            res = proc.process(DepthFrame(d, i / 30, i + 1, sim.intrinsics, "sim", ex), 2.5)
+        out[acc] = (res.ground, res.reported[0])
+    g, wall_seen = out[True]
+    assert g["source"] == "gravity" and abs(g["height"] - 0.9) < 0.05
+    assert abs(wall_seen["h_min"] - 0.4) < 0.12 and abs(wall_seen["h_max"] - 1.23) < 0.12
+    assert out[False][0]["source"] == "none"  # the old behaviour: back to the configured 1.25 m
+
+
+def test_sensor_pointing_at_floor_is_announced(tmp_path, cfg):
+    from echosense.app import EchoSense
+    app = EchoSense(cfg, source="sim", audio="none", settings_path=str(tmp_path / "s.json"))
+    said = []
+    app.speech.say = lambda text, *a, **k: said.append(text)
+    g = app.processor.gravity
+    g.signs[:] = (0.0, -1.0, 1.0)
+    g.verified = True
+    pitch = math.radians(-60)
+    for i in range(40):  # 1.3 s pointing 60 deg down
+        g.update((0.0, 9.8 * math.cos(pitch), 9.8 * math.sin(pitch)), i / 30)
+        app._check_pointing(i / 30)
+    assert said == [cfg["phrases"]["pointing_floor"]]
+
+
+def test_kinect1_accel_mirrors_with_image(cfg):
+    from echosense.sensors.kinect1 import Kinect1Source
+
+    class FakeAccel:
+        latest = (1.0, 9.7, -1.5, time.monotonic())
+
+    src = Kinect1Source.__new__(Kinect1Source)
+    src._accel, src.flip = FakeAccel(), False
+    assert src.accel() == (1.0, 9.7, -1.5)
+    src.flip = True
+    assert src.accel() == (-1.0, 9.7, -1.5)
+    FakeAccel.latest = (1.0, 9.7, -1.5, time.monotonic() - 2)
+    assert src.accel() is None  # stale readings are never used
+
+
+@pytest.mark.parametrize("pids,opens", [({0x02AD, 0x02AE}, False), ({0x02B0, 0x02AE}, True), (None, True)])
+def test_accelerometer_probe_skips_model_1473(cfg, monkeypatch, pids, opens):
+    """Model 1473's accelerometer sits behind the audio chip (needs firmware): never probed unless forced."""
+    from echosense.sensors import kinect1
+
+    tried = []
+
+    class FakeAccel:
+        def open(self):
+            tried.append(1)
+            raise OSError("no device")
+
+    monkeypatch.setattr(kinect1, "kinect_usb_products", lambda: pids)
+    monkeypatch.setattr(kinect1, "FreenectAccel", FakeAccel)
+    src = kinect1.Kinect1Source.__new__(kinect1.Kinect1Source)
+    src.want_accel, src._accel, src.accel_status = "auto", None, "off"
+    src._open_accel()
+    assert bool(tried) == opens
+    if not opens:
+        assert "1473" in src.accel_status
+
+
+def test_real_kinect1_room_without_floor_has_no_phantom_holes():
+    """Recorded on a real Kinect v1 (model 1473) sitting about level on a desk, every second pixel:
+    two walls and furniture, no floor in view, mount settings left at 1.58 m / -24 deg from an earlier
+    fitting. A sloping piece of furniture used to be taken for the floor, and the room filled with
+    phantom holes. Now no floor is invented and the walls say which way is up."""
+    from pathlib import Path
+    z = np.load(Path(__file__).parent / "data" / "kinect1_room_no_floor.npz")
+    intr = json.loads(str(z["intr"]))
+    I = {"width": 320, "height": 240, "fx": intr["fx"] / 2, "fy": intr["fy"] / 2, "cx": intr["cx"] / 2, "cy": intr["cy"] / 2}
+    cfg = load_config()
+    proc = DepthProcessor(cfg)
+    proc.set_mount(1.579, -24.18)
+    for i in range(30):
+        d = z["depth"][i % len(z["depth"])].astype(np.float32) / 1000
+        res = proc.process(DepthFrame(d, i / 15, i + 1, I, "kinect1"), 4.0)
+    assert not any(o["kind"] == "drop" for o in res.reported)
+    assert res.ground["source"] == "walls" and 3.0 < res.ground["pitch"] < 11.0  # about level, tilted up
+
+
+def test_autowalk_route_end_does_not_deadlock(cfg):
+    """The live loop holds the scene lock while stepping; at the end of the route auto-walk resets the
+    scene, which takes the lock again. A plain Lock froze the simulator there."""
+    import threading
+
+    sim = SimulatedKinect(cfg, "maysan_street", seed=1)
+    sim.autowalk = True
+    sim.route_i = len(sim.route)
+    done = threading.Event()
+
+    def step():
+        with sim._scene_lock:
+            sim._step(1 / 30, 0.0)
+        done.set()
+
+    threading.Thread(target=step, daemon=True).start()
+    assert done.wait(5), "simulator deadlocked at the end of the auto-walk route"
+    assert sim.route_i == 1

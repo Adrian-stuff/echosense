@@ -14,7 +14,8 @@ Implements the proposal's processing stage (System functions C2, C3, C4, C7):
 5. suppress walls running parallel to the walking direction and objects
    outside the walking corridor,
 6. track obstacles over time (false-positive suppression: an obstacle has to
-   be seen in ``confirm_frames`` consecutive-ish frames before it is reported),
+   be seen in enough frames, for long enough and in most of the frames since it
+   first appeared before it is reported; see ``sensitivity_levels``),
 7. order reportable obstacles: in the direct path first, then nearest, with
    head-level hazards and drop-offs promoted.
 """
@@ -27,7 +28,9 @@ from dataclasses import dataclass, field
 import numpy as np
 from ..sensors.base import DepthFrame
 from .depthfilter import DepthFrontEnd
+from .gravity import GravityEstimator
 from .objects import CLASSES, ObjectRecognizer, drop_label, shape_features
+from .worldmap import WorldMapper
 
 UP = np.array([0.0, 1.0, 0.0])
 
@@ -156,6 +159,30 @@ class Track:
     probs: np.ndarray | None = None  # smoothed class probabilities from the recogniser
     memory: bool = False  # near mode: kept alive after going too close for the sensor to see
     features: np.ndarray | None = None
+    frames: int = 1  # frames processed since it first appeared (hits / frames = how steadily it is seen)
+    stable_label: str | None = None  # recognised class, with hysteresis so it doesn't flicker
+    pend: dict = field(default_factory=dict)  # attribute -> (proposed value, frames seen) awaiting settle
+
+    def settle(self, attr: str, new, frames: int):
+        """Change ``attr`` only once ``new`` has been observed ``frames`` frames in a row."""
+        if new == getattr(self, attr):
+            self.pend.pop(attr, None)
+            return
+        v, n = self.pend.get(attr, (None, 0))
+        n = n + 1 if v == new else 1
+        if n >= frames:
+            setattr(self, attr, new)
+            self.pend.pop(attr, None)
+        else:
+            self.pend[attr] = (new, n)
+
+    def predicted_xz(self, t: float) -> tuple[float, float]:
+        """Where it should be now: moved along its bearing at its closing speed since last seen."""
+        dt = t - self.last_seen
+        if dt <= 0 or self.r <= 0.05:
+            return self.x, self.z
+        f = max(0.2, self.r + self.vel_r * dt) / self.r
+        return self.x * f, self.z * f
 
     @property
     def label(self) -> str:
@@ -170,16 +197,15 @@ class Track:
             return "overhang"
         if self.kind == "low":
             return "low"
-        if self.probs is None or self.hits < 3:
-            return "unknown"
-        i = int(np.argmax(self.probs))
-        return CLASSES[i] if self.probs[i] >= 0.45 else "unknown"
+        return self.stable_label or "unknown"
 
     @property
     def label_conf(self) -> float:
         if self.kind in ("drop", "edge", "head", "low"):
             return 1.0
-        return 0.0 if self.probs is None else float(self.probs.max())
+        if self.probs is None or self.stable_label is None:
+            return 0.0
+        return float(self.probs[CLASSES.index(self.stable_label)])
 
     def el(self, ear_height: float) -> float:
         if self.kind == "head":
@@ -207,7 +233,7 @@ class Track:
                 "el": round(self.el(ear_height), 1), "x": round(self.x, 3), "z": round(self.z, 3),
                 "h_min": round(self.h_min, 2), "h_max": round(self.h_max, 2), "width": round(self.width, 2),
                 "in_path": self.in_path, "suppressed": self.suppressed, "confirmed": self.confirmed,
-                "memory": self.memory,
+                "memory": self.memory, "hits": self.hits,
                 "vel_r": round(self.vel_r, 2), "first_seen": self.first_seen, "eligible_since": self.eligible_since,
                 "ttc": None if self.ttc() is None else round(self.ttc(), 2), "r_urgent": round(self.urgency_range(), 3),
                 "label": self.label, "label_conf": round(self.label_conf, 2),
@@ -225,6 +251,7 @@ class ProcessResult:
     timings: dict
     counts: dict = field(default_factory=dict)
     quality: float = 1.0  # share of floor-facing pixels that returned depth (sunlight / dropout indicator)
+    world: dict | None = None  # world map pose and status (processing/worldmap.py), None when off
 
 
 class DepthProcessor:
@@ -233,30 +260,59 @@ class DepthProcessor:
         self.p = cfg["processing"]
         self._intr_key = None
         self.tracks: list[Track] = []
+        self._top_id = None
         self._next_id = 1
         self.plane: np.ndarray | None = None  # (nx, ny, nz, d) with n.p + d = height
         self.plane_age = 0.0
         self.plane_ok = False
+        self.plane_auto = False  # the floor was found away from the configured mount (see _ground)
+        self.plane_src = "none"  # fit | gravity | none: where the current floor estimate comes from
+        self.gravity = GravityEstimator()
+        self._walls_up = None  # (up in body frame, time): from two large walls, when no accelerometer
+        self._last_height = None  # sensor height above the last well-fitted floor
+        self._last_search = -1e9
         self.rng = np.random.default_rng(7)
         self.front = DepthFrontEnd(self.p)
         self.max_seen_depth = 0.0
         self.near_mode = bool(self.p.get("near_mode", False))
         self.depth_stats = {"near": None, "far": None}
+        wm = self.p.get("world_map") or {}
+        self.mapper = WorldMapper(wm) if wm.get("enabled", False) else None
         self.recognizer = ObjectRecognizer(self.p.get("object_model") or None) if self.p.get("recognition", True) else None
+        self.set_sensitivity(cfg.get("default_sensitivity", "normal"))
         self.set_mount(cfg["sensor"]["mount_height"], cfg["sensor"]["mount_pitch_deg"])
 
     # ---------------------------------------------------------------- setup
+    def set_sensitivity(self, level: str):
+        levels = self.cfg.get("sensitivity_levels") or {}
+        self.sensitivity = level if level in levels else "high"
+        self.sens = dict(levels.get(self.sensitivity, {}))
+        self.confirm_frames = int(self.p["confirm_frames"]) + int(self.sens.get("confirm_extra", 0))
+
+    def frames_to_confirm(self, fps: float) -> int:
+        """Frames from first sight to the first cue at this frame rate (frame count and minimum age)."""
+        return max(self.confirm_frames, int(math.ceil(float(self.sens.get("min_age", 0.0)) * fps - 1e-6)) + 1)
+
     def set_mount(self, height: float, pitch_deg: float):
         self.mount_height = float(height)
         self.mount_pitch = float(pitch_deg)
         self.M = mount_matrix(self.mount_pitch)
         self.plane = None
+        self.plane_auto = False
+        self._last_height = None
+        self._last_search = -1e9
         self._intr_key = None  # floor-facing mask depends on the mount
 
     def reset(self):
         self.tracks = []
+        self._top_id = None
         self.plane = None
+        self._last_height = None
+        self.gravity.reset()  # a mirrored image or another sensor flips the learned axes
+        self._last_search = -1e9
         self.front.reset()
+        if self.mapper is not None:
+            self.mapper.reset()
 
     def effective_stride(self, fx: float) -> int:
         """``stride`` is tuned for the Kinect v2 (0.16 deg per pixel). Other sensors get the stride
@@ -284,6 +340,7 @@ class DepthProcessor:
         self.cols = np.tile(np.arange(w, dtype=np.int32), h)
         self.fx_used = float(intr["fx"])
         self.vfov = math.degrees(2 * math.atan2(H / 2, intr["fy"]))
+        self.hfov = math.degrees(2 * math.atan2(W / 2, intr["fx"]))
         # pixels whose ray meets the floor between 0.8 and 3.5 m: with a healthy sensor nearly all of
         # them return depth (floor or whatever stands on it), so their dropout rate measures sensing quality
         M = self.M
@@ -325,25 +382,39 @@ class DepthProcessor:
         t1 = time.perf_counter()
 
         self._last_pts = (X, Y, Z)
+        acc = frame.extra.get("accel") if frame.extra else None
+        if acc is not None:
+            self.gravity.update(acc, frame.t_capture)
         hgt = self._ground(X, Y, Z, frame.t_capture)
+        tm0 = time.perf_counter()
+        if self.mapper is not None:
+            normal = self.plane[:3] if self.plane is not None else UP
+            self.mapper.update(X, Y, Z, hgt, normal, self._sensor_height(), frame.t_capture,
+                               truth=frame.extra.get("pose") if frame.extra else None)
         t2 = time.perf_counter()
 
         gtol = p["ground_tolerance"]
         top = p["user_height"] + p["head_margin"]
         gw, gd, cell = p["grid_half_width"], p["grid_depth"], p["cell_size"]
         in_grid = (X > -gw) & (X < gw) & (Z > 0) & (Z < gd)
-        obst = in_grid & (hgt > gtol) & (hgt < top)
-        drop = in_grid & (hgt < -p["drop_threshold"])
+        # a small tilt error in the fitted floor (walking bob, an uneven pavement) lifts the far floor
+        # by tilt x distance, and depth noise grows with distance too: widen the floor band with range
+        slope = float(self.sens.get("ground_slope", 0.0))
+        extra = slope * np.maximum(Z - 2.5, 0.0) if slope > 0 else 0.0
+        obst = in_grid & (hgt > gtol + extra) & (hgt < top)
+        drop = in_grid & (hgt < -(p["drop_threshold"] + extra))
         ground = np.abs(hgt) <= gtol
         # the walking corridor is clustered on its own so that a wall or parked car beside the path
         # never merges with (and hides the distance of) an obstacle that is actually in the path
-        corr = np.abs(X) <= p["corridor_half_width"]
+        corridor = p["corridor_half_width"] * float(self.sens.get("corridor_scale", 1.0))
+        corr = np.abs(X) <= corridor
         rec = self.recognizer is not None  # shape features are computed even before a model is trained
         full_lab = np.zeros(X.size, np.int32)
         if rec and obst.any():
             seg = self._segment(X[obst], Z[obst], cell, gw, gd)
             if seg is not None:
                 full_lab[obst] = seg[0]
+        self._obst_pts = (X[obst], Z[obst], hgt[obst])  # for the overhang occlusion check
         found = []
         for part, in_path in ((obst & corr, True), (obst & ~corr, False)):
             found += self._clusters(X[part], Z[part], hgt[part], cell, gw, gd, drop=False, in_path=in_path,
@@ -372,7 +443,7 @@ class DepthProcessor:
                                           float(min(sign * inner, sign * (inner + 0.4))), float(max(sign * inner, sign * (inner + 0.4))),
                                           float(zb.min()), float(zb.max()), int(band.sum()), False, True))
             xd, zd, hd = xd[keep], zd[keep], hd[keep]
-            corr = np.abs(xd) <= p["corridor_half_width"]
+            corr = np.abs(xd) <= corridor
             for part, in_path in ((corr, True), (~corr, False)):
                 found += self._clusters(xd[part], zd[part], hd[part], cell, gw, gd, drop=True, in_path=in_path)
         t3 = time.perf_counter()
@@ -388,8 +459,9 @@ class DepthProcessor:
             seq=frame.seq, t_capture=frame.t_capture, tracks=list(self.tracks),
             reported=[t.to_dict(ear_height) for t in reported], valid_ratio=valid_ratio, quality=quality,
             ground=self.ground_info(),
-            timings={"project": ms(t0, t1), "ground": ms(t1, t2), "cluster": ms(t2, t3), "track": ms(t3, t4),
-                     "total": ms(t0, t4)},
+            timings={"project": ms(t0, t1), "ground": ms(t1, tm0), "map": ms(tm0, t2), "cluster": ms(t2, t3),
+                     "track": ms(t3, t4), "total": ms(t0, t4)},
+            world=self.mapper.state() if self.mapper is not None else None,
             counts={"points": int(valid.sum()), "ground": int(ground.sum()), "obstacle": int(obst.sum()),
                     "drop": int(drop.sum())},
         )
@@ -401,31 +473,154 @@ class DepthProcessor:
         n, d = self.plane[:3], self.plane[3]
         return float(n[1] * self.mount_height + d)
 
+    def gravity_up(self, t: float) -> np.ndarray | None:
+        """Up in the body frame from the accelerometer, once its axes have been verified."""
+        u = self.gravity.up_cam(t)
+        return None if u is None else self.M @ u
+
+    def level_ref(self, t: float) -> np.ndarray | None:
+        """Best known "up" to check floor candidates against: the accelerometer, else recent walls."""
+        g = self.gravity_up(t)
+        if g is not None:
+            return g
+        if self._walls_up is not None and t - self._walls_up[1] < 3.0:
+            return self._walls_up[0]
+        return None
+
     def _ground(self, X, Y, Z, t):
         p = self.p
         band = p["ground_search_band"]
+        g_up = self.gravity_up(t)
+        level = self.level_ref(t)
+        # search near the floor we are already tracking (or, before that, the nominal mount): once
+        # the floor has been found somewhere unexpected it is followed from there
+        href = Y if self.plane is None else self.plane[0] * X + self.plane[1] * Y + self.plane[2] * Z + self.plane[3]
         # the floor the user walks on is the one under the corridor; a street or step beside the
         # sidewalk must not win the fit just because it fills more of the image
-        cand = (np.abs(Y) < band) & (Z > 0.3) & (Z < 4.0) & (np.abs(X) < p["corridor_half_width"] + 0.35)
+        cand = (np.abs(href) < band) & (Z > 0.3) & (Z < 4.0) & (np.abs(X) < p["corridor_half_width"] + 0.35)
         idx = np.flatnonzero(cand)
         fitted = None
         if idx.size >= 150:
             P = np.stack([X[idx], Y[idx], Z[idx]], 1).astype(np.float64)
-            fitted = self._ransac(P, p["ransac_iterations"], p["ransac_threshold"])
+            fitted = self._ransac(P, p["ransac_iterations"], p["ransac_threshold"], level)
+        if fitted is None and (self.plane is None or t - self.plane_age > 0.5) and t - self._last_search >= 0.4:
+            # the sensor is not where the configuration says (on a desk, held in the hand, strapped
+            # higher or tilted more): without this the whole floor would be reported as an obstacle
+            # or a drop-off, all the time. Look for the floor anywhere in view and follow it.
+            self._last_search = t
+            g = self._find_floor(X, Y, Z, n_sub=1500, iters=300, g_up=g_up, t=t)
+            if g is not None:
+                fitted = g[0]
+                self.plane = None  # adopt it outright, don't blend with a floor that was wrong
+                if not self.plane_auto:
+                    self.plane_auto = True
         if fitted is not None:
-            a = p["ground_smoothing"] if self.plane is not None else 1.0
+            a = p["ground_smoothing"] if self.plane is not None and self.plane_src == "fit" else 1.0
             plane = fitted if self.plane is None else (1 - a) * self.plane + a * fitted
             plane[:3] /= np.linalg.norm(plane[:3])
-            self.plane, self.plane_age, self.plane_ok = plane, t, True
+            self.plane, self.plane_age, self.plane_ok, self.plane_src = plane, t, True, "fit"
+            self._last_height = self._sensor_height()
+            if self.gravity.acc is not None:
+                self.gravity.learn_from_floor(self.M.T @ fitted[:3])
+        elif self.level_ref(t) is not None and (self.plane is None or t - self.plane_age > 0.3):
+            # no floor in view (facing a wall up close, a crowd, a covered floor, a sensor on a desk
+            # looking level): level from gravity, or from the walls, at the height the floor was last
+            # seen. Before, it fell back to the configured mount after 2 s, and a mount that is off by
+            # 20 deg turns the far end of the room into "holes".
+            lv = self.level_ref(t)
+            h = self._last_height if self._last_height is not None else self.mount_height
+            self.plane = np.array([*lv, h - lv[1] * self.mount_height])
+            self.plane_ok, self.plane_src = False, ("gravity" if g_up is not None else "walls")
         elif self.plane is not None and t - self.plane_age > 2.0:
-            self.plane, self.plane_ok = None, False  # stale: fall back to the nominal mount
+            self.plane, self.plane_ok, self.plane_src = None, False, "none"  # stale: fall back to the nominal mount
         if self.plane is None:
             self.plane_ok = fitted is not None
             return Y
         n, d = self.plane[:3], self.plane[3]
         return n[0] * X + n[1] * Y + n[2] * Z + d
 
-    def _ransac(self, P: np.ndarray, iters: int, thr: float):
+    def _walls_up_from(self, sub, nrm, ds, counts):
+        """Indoors, the biggest surfaces are often walls, and walls are vertical: two walls that aren't
+        parallel give "up" as the direction along both (no floor or accelerometer needed). Returns the
+        up vector (body frame) or None."""
+        wall = np.abs(nrm[:, 1]) < np.sin(np.radians(40))  # far from the configured "up": vertical-ish
+        if wall.sum() < 2:
+            return None
+        order = np.argsort(-np.where(wall, counts, -1))
+        i1 = order[0]
+        n1, c1 = nrm[i1], counts[i1]
+        if c1 < 0.15 * sub.shape[0]:
+            return None
+        on1 = np.abs(sub @ n1 + ds[i1]) < 0.03
+        for j in order[1:]:
+            if not wall[j] or counts[j] < 0.08 * sub.shape[0]:
+                break
+            n2 = nrm[j]
+            # a different wall: not parallel, and mostly its own points (not a sliver of the first one)
+            own = (np.abs(sub @ n2 + ds[j]) < 0.03) & ~on1
+            if abs(float(n1 @ n2)) < np.cos(np.radians(30)) and own.sum() >= 0.08 * sub.shape[0]:
+                u = np.cross(n1, n2)
+                u /= max(np.linalg.norm(u), 1e-9)
+                u *= np.sign(u[1] + 1e-12)
+                return u if u[1] > np.cos(np.radians(45)) else None
+        return None
+
+    def _find_floor(self, X, Y, Z, n_sub: int = 3000, iters: int = 600, seed: int | None = None, g_up=None,
+                    t: float | None = None):
+        """The floor anywhere in view, assuming nothing about mount height or tilt: of the large level
+        surfaces, the lowest (a table top is level too, but higher). "Level" is checked against the
+        accelerometer when there is one, else against the walls when two are in view. Returns
+        ((n, d) plane, inlier count), or None: better no floor than a sloping chair seat taken for one,
+        which turns everything beyond it into holes."""
+        m = (Z > 0.3) & (Z < 4.5)
+        if m.sum() < 300:
+            return None
+        P = np.stack([X[m], Y[m], Z[m]], 1).astype(np.float64)
+        rng = self.rng if seed is None else np.random.default_rng(seed)
+        sub = P[rng.choice(P.shape[0], min(P.shape[0], n_sub), replace=False)]
+        tri = sub[rng.integers(0, sub.shape[0], (iters, 3))]
+        nrm = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
+        ln = np.linalg.norm(nrm, axis=1)
+        ok = ln > 1e-9
+        nrm, tri = nrm[ok] / ln[ok, None], tri[ok]
+        nrm *= np.sign(nrm[:, 1:2] + 1e-12)
+        ds_all = -(nrm * tri[:, 0]).sum(1)
+        counts_all = (np.abs(sub @ nrm.T + ds_all) < 0.03).sum(0)
+        if g_up is None:
+            wu = self._walls_up_from(sub, nrm, ds_all, counts_all)
+            if wu is not None and t is not None:
+                self._walls_up = (wu, t)
+            g_up = wu
+        # tolerate a badly guessed tilt; with an accelerometer or walls, only surfaces that really are level
+        up = (nrm[:, 1] > np.cos(np.radians(35))) if g_up is None else (nrm @ g_up > np.cos(np.radians(12)))
+        nrm, ds, counts = nrm[up], ds_all[up], counts_all[up]
+        if not len(nrm):
+            return None
+        heights = nrm[:, 1] * self.mount_height + ds  # sensor height above each candidate plane
+        sane = (heights > 0.2) & (heights < 2.5)
+        if not sane.any():
+            return None
+        top = int(np.argmax(np.where(sane, counts, -1)))  # the dominant level surface sets "up"
+        if counts[top] < max(60, 0.12 * sub.shape[0]):
+            return None
+        parallel = (nrm @ nrm[top]) > np.cos(np.radians(6))
+        # of the parallel surfaces, a clearly lower one (a desk top above the floor) is the floor; slices
+        # of the same floor a few cm apart (Kinect v1 depth terraces, noise) are not separate surfaces
+        lower = sane & parallel & (counts >= max(60, 0.3 * counts[top])) & (heights > heights[top] + 0.10)
+        best = int(np.argmax(np.where(lower, heights, -1))) if lower.any() else top
+        n, d = nrm[best], ds[best]
+        inl = P[:0]
+        for thr in (0.06, 0.04, 0.03):  # refine: least squares on the inliers, tightening
+            inl = P[np.abs(P @ n + d) < thr]
+            if inl.shape[0] < 100:
+                return None
+            c = inl.mean(0)
+            _, _, vt = np.linalg.svd(inl - c, full_matrices=False)
+            n = vt[2] * (1 if vt[2][1] > 0 else -1)
+            d = -float(n @ c)
+        return np.array([*n, d]), int(inl.shape[0])
+
+    def _ransac(self, P: np.ndarray, iters: int, thr: float, g_up=None):
         n = P.shape[0]
         sub = P[self.rng.choice(n, min(n, 600), replace=False)]
         tri = sub[self.rng.integers(0, sub.shape[0], (iters, 3))]
@@ -436,7 +631,9 @@ class DepthProcessor:
             return None
         normals = normals[ok] / norm[ok, None]
         normals *= np.sign(normals[:, 1:2] + 1e-12)
-        upright = normals[:, 1] > math.cos(math.radians(20))
+        # level enough to be the floor: within 20 deg of the mount's "up", or with a verified accelerometer
+        # within 15 deg of gravity (a ramp is fine, a table edge or a car bonnet is not)
+        upright = (normals[:, 1] > math.cos(math.radians(20))) if g_up is None else (normals @ g_up > math.cos(math.radians(15)))
         if not upright.any():
             return None
         normals, tri = normals[upright], tri[ok][upright]
@@ -460,62 +657,33 @@ class DepthProcessor:
         c = inl.mean(0)
         _, _, vt = np.linalg.svd(inl - c, full_matrices=False)
         nrm = vt[2] * (1 if vt[2][1] > 0 else -1)
-        if nrm[1] < math.cos(math.radians(20)):
+        if (nrm[1] if g_up is None else float(nrm @ g_up)) < math.cos(math.radians(20 if g_up is None else 15)):
             return None
         return np.array([*nrm, -float(nrm @ c)])
 
     def calibrate_floor(self) -> dict | None:
         """Find the floor anywhere in view (no assumption about mount height or tilt) and return the
         sensor height and tilt it implies, or None. Used by "Calibrate from floor": the device may sit
-        on a desk, a tripod or a chest strap. Of the large level surfaces, the lowest is the floor
-        (a table top is level too, but higher)."""
+        on a desk, a tripod or a chest strap."""
         pts = getattr(self, "_last_pts", None)
         if pts is None:
             return None
-        X, Y, Z = pts
-        m = (Z > 0.3) & (Z < 4.5) & (Y < self.mount_height + 0.2)
-        P = np.stack([X[m], Y[m], Z[m]], 1).astype(np.float64)
-        if P.shape[0] < 300:
+        g = self._find_floor(*pts, seed=1)
+        if g is None:
             return None
-        rng = np.random.default_rng(1)
-        sub = P[rng.choice(P.shape[0], min(P.shape[0], 3000), replace=False)]
-        tri = sub[rng.integers(0, sub.shape[0], (600, 3))]
-        nrm = np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0])
-        ln = np.linalg.norm(nrm, axis=1)
-        ok = ln > 1e-9
-        nrm, tri = nrm[ok] / ln[ok, None], tri[ok]
-        nrm *= np.sign(nrm[:, 1:2] + 1e-12)
-        up = nrm[:, 1] > np.cos(np.radians(35))  # tolerate a badly guessed tilt
-        nrm, tri = nrm[up], tri[up]
-        if not len(nrm):
-            return None
-        ds = -(nrm * tri[:, 0]).sum(1)
-        counts = (np.abs(sub @ nrm.T + ds) < 0.03).sum(0)
-        heights = nrm[:, 1] * self.mount_height + ds  # sensor height above each candidate plane
-        sane = (heights > 0.2) & (heights < 2.5)
-        if not sane.any():
-            return None
-        top = int(np.argmax(np.where(sane, counts, -1)))  # the dominant level surface sets "up"
-        parallel = (nrm @ nrm[top]) > np.cos(np.radians(6))
-        big = sane & parallel & (counts >= max(150, 0.3 * counts[top]))
-        best = int(np.argmax(np.where(big, heights, -1)))  # of those parallel surfaces, the lowest is the floor
-        inl = P[np.abs(P @ nrm[best] + ds[best]) < 0.03]
-        c = inl.mean(0)
-        _, _, vt = np.linalg.svd(inl - c, full_matrices=False)
-        n = vt[2] * (1 if vt[2][1] > 0 else -1)
-        d = -float(n @ c)
-        height = float(n[1] * self.mount_height + d)
-        pitch = self.mount_pitch + float(np.degrees(np.arctan2(n[2], n[1])))
-        return {"height": round(height, 3), "pitch": round(pitch, 2), "inliers": int(inl.shape[0])}
+        (nx, ny, nz, d), inliers = g
+        height = float(ny * self.mount_height + d)
+        pitch = self.mount_pitch + float(np.degrees(np.arctan2(nz, ny)))
+        return {"height": round(height, 3), "pitch": round(pitch, 2), "inliers": inliers}
 
     def ground_info(self) -> dict:
         if self.plane is None:
-            return {"ok": False, "height": self.mount_height, "pitch": self.mount_pitch,
+            return {"ok": False, "height": self.mount_height, "pitch": self.mount_pitch, "source": "none",
                     "plane": [0.0, 1.0, 0.0, 0.0]}
         n = self.plane[:3]
         # a sensor pitched further down than nominal sees the floor tilted towards it
         pitch_err = math.degrees(math.atan2(n[2], n[1]))
-        return {"ok": self.plane_ok, "height": round(self._sensor_height(), 3),
+        return {"ok": self.plane_ok, "height": round(self._sensor_height(), 3), "source": self.plane_src,
                 "pitch": round(self.mount_pitch + pitch_err, 2), "plane": [round(float(v), 5) for v in self.plane]}
 
     # ------------------------------------------------------------- clusters
@@ -533,7 +701,16 @@ class DepthProcessor:
             return None
         return labels.ravel()[flat], nlab
 
-    def _seen_below(self, r: float) -> float:
+    def _hidden_below(self, x_min, x_max, z_min, z_max, h_min) -> bool:
+        """Is the space under this obstacle hidden by something lower standing in front of it or under it?"""
+        X, Z, Hh = getattr(self, "_obst_pts", (None, None, None))
+        if X is None or X.size == 0:
+            return False
+        m = ((X >= x_min - 0.1) & (X <= x_max + 0.1) & (Z >= z_min - 0.8) & (Z <= z_max + 0.05)
+             & (Hh < h_min - 0.25))
+        return int(m.sum()) >= 5
+
+    def _seen_below(self, r: float, margin: float = 0.0) -> float:
         """Lowest height the sensor sees at horizontal distance r: limited by the bottom edge of the
         field of view and, far away, by the depth limit (measured along the tilted optical axis, so
         the bottom of a distant object goes out of range before its top)."""
@@ -543,7 +720,7 @@ class DepthProcessor:
         seen = H + r * math.tan(lo)
         a = math.radians(-pitch)
         if a > 0.01 and self.max_seen_depth > 0:
-            seen = max(seen, H - (self.max_seen_depth - r * math.cos(a)) / math.sin(a))
+            seen = max(seen, H - (self.max_seen_depth - margin - r * math.cos(a)) / math.sin(a))
         return max(0.0, seen)
 
     def _describe(self, found, X, Z, hgt, full_lab):
@@ -561,12 +738,14 @@ class DepthProcessor:
                 x, z, h = X[m], Z[m], hgt[m]
                 r = np.hypot(x, z)
                 cache[ob.full_id] = shape_features(x, z, h, r, float(np.percentile(r, 5)), self.stride_used,
-                                                   self.fx_used, sh, g["pitch"], self.vfov, top) if m.sum() >= 6 else None
+                                                   self.fx_used, sh, g["pitch"], self.vfov, top,
+                                                   hfov_deg=self.hfov) if m.sum() >= 6 else None
             ob.features = cache[ob.full_id]
 
     def _clusters(self, X, Z, Hh, cell, gw, gd, drop: bool, in_path: bool, cols=None, full=None) -> list[Obstacle]:
         p = self.p
-        if X.size < p["min_cluster_points"]:
+        min_pts = max(p["min_cluster_points"], int(round(p["min_cluster_points"] * float(self.sens.get("cluster_scale", 1.0)))))
+        if X.size < min_pts:
             return []
         nx, nz = int(round(2 * gw / cell)), int(round(gd / cell))
         ix = np.clip(((X + gw) / cell).astype(np.int32), 0, nx - 1)
@@ -588,7 +767,7 @@ class DepthProcessor:
         out = []
         for k in range(nlab):
             sel = order[bounds[k]:bounds[k + 1]]
-            if sel.size < p["min_cluster_points"]:
+            if sel.size < min_pts:
                 continue
             x, zz, h = X[sel], Z[sel], Hh[sel]
             r = np.hypot(x, zz)
@@ -609,10 +788,12 @@ class DepthProcessor:
             if drop:
                 kind = "drop"
                 h_min, h_max = float(h.min()), 0.0
-            elif h_min >= p["overhang_min_height"] and self._seen_below(r_near) < h_min - 0.25:
+            elif (h_min >= p["overhang_min_height"] and self._seen_below(r_near, margin=0.3) < h_min - 0.25
+                  and not self._hidden_below(x_min, x_max, z_min, z_max, h_min)):
                 # free space below is only proven if the sensor actually saw below it: up close the
-                # bottom of the field of view cuts off the lower half of a tricycle, which must not
-                # be mistaken for an overhang
+                # bottom of the field of view cuts off the lower half of a tricycle, far away the depth
+                # limit cuts off the bottom of a wall, and the top of a parked motorcycle hides the
+                # space under its own far end. None of those is an overhang.
                 kind = "head"
             elif h_max <= p["low_max_height"]:
                 kind = "low"
@@ -638,12 +819,18 @@ class DepthProcessor:
     def _track(self, found: list[Obstacle], t: float):
         p = self.p
         gate, alpha = p["assoc_gate"], p["smoothing"]
+        need, min_age = self.confirm_frames, float(self.sens.get("min_age", 0.0))
+        ratio = float(self.sens.get("hit_ratio", 0.0))
+        for tr in self.tracks:
+            if not tr.memory:
+                tr.frames += 1
         pairs = []
         for i, tr in enumerate(self.tracks):
+            px, pz = tr.predicted_xz(t)
             for j, ob in enumerate(found):
                 if (tr.kind in ("drop", "edge")) != (ob.kind in ("drop", "edge")):
                     continue
-                d = math.hypot(tr.x - ob.x, tr.z - ob.z)
+                d = math.hypot(px - ob.x, pz - ob.z)
                 if d < gate:
                     pairs.append((d, i, j))
         pairs.sort()
@@ -653,36 +840,14 @@ class DepthProcessor:
                 continue
             used_t.add(i)
             used_o.add(j)
-            tr, ob = self.tracks[i], found[j]
-            dt = max(t - tr.last_seen, 1e-3)
-            # alpha-beta filter on range: smooths noise without lagging behind something that moves
-            pred = tr.r + tr.vel_r * dt
-            res = ob.r - pred
-            if ob.r < pred - 0.3:
-                tr.r = ob.r  # suddenly much closer: take it at once, safety first
-            else:
-                tr.r = pred + alpha * res
-            tr.vel_r = float(np.clip(tr.vel_r + p["velocity_gain"] * res / dt, -5.0, 5.0))
-            tr.az = (1 - alpha) * tr.az + alpha * ob.az
-            tr.x, tr.z = ob.x, ob.z
-            tr.h_min, tr.h_max = ob.h_min, ob.h_max
-            tr.width = ob.x_max - ob.x_min
-            tr.x_min, tr.x_max, tr.z_min, tr.z_max = ob.x_min, ob.x_max, ob.z_min, ob.z_max
-            tr.in_path, tr.suppressed = ob.in_path, ob.suppressed
-            self._recognise(tr, ob)
-            if tr.kind != ob.kind and ob.kind != "drop":
-                tr.kind = ob.kind
-            tr.last_seen = t
-            tr.hits += 1
-            if not tr.confirmed and tr.hits >= p["confirm_frames"]:
-                tr.confirmed, tr.confirmed_at = True, t
+            self._update(self.tracks[i], found[j], t, need, min_age, ratio)
         for j, ob in enumerate(found):
             if j in used_o:
                 continue
             tr = Track(self._next_id, ob.kind, ob.x, ob.z, ob.r, ob.az, ob.h_min, ob.h_max, ob.x_max - ob.x_min,
                        ob.in_path, ob.suppressed, t, t, ob.x_min, ob.x_max, ob.z_min, ob.z_max)
             self._recognise(tr, ob)
-            if p["confirm_frames"] <= 1:
+            if need <= 1 and min_age <= 0:
                 tr.confirmed, tr.confirmed_at = True, t
             self._next_id += 1
             self.tracks.append(tr)
@@ -703,6 +868,38 @@ class DepthProcessor:
                 keep.append(tr)
         self.tracks = keep
 
+    def _update(self, tr: Track, ob: Obstacle, t: float, need: int, min_age: float, ratio: float):
+        p = self.p
+        alpha = p["smoothing"]
+        dt = max(t - tr.last_seen, 1e-3)
+        # alpha-beta filter on range: smooths noise without lagging behind something that moves
+        pred = max(0.0, tr.r + tr.vel_r * dt)
+        res = ob.r - pred
+        if ob.r < pred - 0.3:
+            tr.r = ob.r  # suddenly much closer: take it at once, safety first
+        else:
+            tr.r = pred + alpha * res
+        tr.vel_r = float(np.clip(tr.vel_r + p["velocity_gain"] * res / dt, -5.0, 5.0))
+        tr.az = (1 - alpha) * tr.az + alpha * ob.az
+        tr.x, tr.z = ob.x, ob.z
+        tr.h_min, tr.h_max = ob.h_min, ob.h_max
+        tr.width = ob.x_max - ob.x_min
+        tr.x_min, tr.x_max, tr.z_min, tr.z_max = ob.x_min, ob.x_max, ob.z_min, ob.z_max
+        # changes that make it more of a hazard apply at once (it enters the path, it stops looking
+        # like a wall beside the path); changes that would quiet it or alter its sound must hold for a
+        # few frames, so the pitch and the cue don't flicker as the shape wobbles
+        tr.settle("in_path", ob.in_path, 1 if ob.in_path else 3)
+        tr.settle("suppressed", ob.suppressed, 3 if ob.suppressed else 1)
+        if ob.kind != "drop":
+            tr.settle("kind", ob.kind, 2 if ob.kind == "head" else 3)
+        self._recognise(tr, ob)
+        tr.last_seen = t
+        tr.hits += 1
+        if tr.confirmed:
+            return
+        if tr.hits >= need and t - tr.first_seen >= min_age - 1e-6 and tr.hits >= ratio * tr.frames:
+            tr.confirmed, tr.confirmed_at = True, t
+
     def _too_close_to_see(self, tr: Track) -> bool:
         p = self.p
         return (tr.confirmed and tr.in_path and not tr.suppressed and tr.kind not in ("drop", "edge")
@@ -715,7 +912,23 @@ class DepthProcessor:
         pr = self.recognizer.proba(ob.features)
         if pr is None:
             return
-        tr.probs = pr if tr.probs is None else 0.75 * tr.probs + 0.25 * pr  # labels settle over ~4 frames
+        tr.probs = pr if tr.probs is None else 0.8 * tr.probs + 0.2 * pr  # labels settle over ~5 frames
+        if tr.hits < 4:
+            return
+        # hysteresis: name it once the evidence is clear, and only rename it when another class is
+        # clearly more likely, so "person" doesn't turn into "pole" and back as the shape wobbles
+        i = int(np.argmax(tr.probs))
+        best = CLASSES[i]
+        need = float(self.p.get("label_min_conf", 0.5))  # below this it is just "Obstacle": better unnamed than misnamed
+        if tr.stable_label is None:
+            if tr.probs[i] >= need:
+                tr.stable_label = best
+        elif best != tr.stable_label:
+            cur = float(tr.probs[CLASSES.index(tr.stable_label)])
+            if tr.probs[i] >= need and tr.probs[i] >= cur + 0.2:
+                tr.stable_label = best
+            elif cur < 0.25:
+                tr.stable_label = None  # no longer anything in particular
 
     def _prioritise(self, range_limit: float, report_off_path: bool, t: float) -> list[Track]:
         bonus = self.p["priority_bonus"]
@@ -732,8 +945,16 @@ class DepthProcessor:
             if tr.reporting:
                 cands.append(tr)
 
+        sticky = float(self.p.get("rank_hysteresis", 0.3))
+
         def key(tr: Track):
             eff = tr.urgency_range() - (bonus if tr.kind in ("head", "drop") else 0.0)
+            # the obstacle sounding first keeps that place until another is clearly more urgent:
+            # two obstacles at similar distances must not trade the lead cue every few frames
+            if tr.id == self._top_id:
+                eff -= sticky
             return (0 if tr.in_path else 1, eff)
 
-        return sorted(cands, key=key)
+        out = sorted(cands, key=key)
+        self._top_id = out[0].id if out else None
+        return out

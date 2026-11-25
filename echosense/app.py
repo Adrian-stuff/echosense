@@ -23,7 +23,7 @@ from .config import expand
 from .device.gpio import start_gpio
 from .device.monitors import Battery, HealthMonitor, SessionLogger
 from .device.perf import PerfMonitor
-from .device.settings import MODES, RANGES, SettingsStore
+from .device.settings import MODES, RANGES, SENSITIVITIES, SettingsStore
 from .device.training import Trainer
 from .processing.objects import SPOKEN
 from .processing.pipeline import DepthProcessor
@@ -46,7 +46,14 @@ class EchoSense:
         self.record_path = record
         self.settings = SettingsStore(expand(settings_path or cfg["paths"]["settings"]))
         s = self.settings.s
+        self._overhang_default = cfg["processing"]["overhang_min_height"]
+        if s.head_height is not None:
+            cfg["processing"]["user_height"] = s.head_height
+            cfg["processing"]["overhang_min_height"] = min(self._overhang_default,
+                max(0.2, (s.ear_height or s.head_height) - cfg["processing"]["head_margin"]))
         a = cfg["audio"]
+        if s.ear_height is not None:
+            a["ear_height"] = s.ear_height
         self.engine = AudioEngine(a["sample_rate"], a["block_size"], a["max_output_dbfs"])
         self.engine.master_gain = volume_gain(s.volume)
         self.hrtf = StructuralHRTF(a["sample_rate"], a["head_radius"])
@@ -67,6 +74,7 @@ class EchoSense:
         self.logger = SessionLogger(expand(cfg["paths"]["logs"]))
         self.trainer = Trainer()
         self.processor = DepthProcessor(cfg)
+        self.processor.set_sensitivity(self.settings.s.sensitivity)
         self.source = None
         self.driver = None
         self.gpio = None
@@ -82,6 +90,10 @@ class EchoSense:
         self._pinged_tracks: set = set()
         self._announced: dict = {}
         self._last_announce = 0.0
+        self._label_said: dict = {}  # label -> (time, direction) of the last automatic announcement
+        self._floor_noted = False
+        self._pointing = None  # "floor" | "sky" while the accelerometer says the sensor points there
+        self._pointing_since = 0.0
         self.m_frames: deque = deque(maxlen=60)
         self.m_proc: deque = deque(maxlen=120)
         self.m_e2e: deque = deque(maxlen=50)
@@ -91,6 +103,9 @@ class EchoSense:
         self.perf_processed = 0  # counters read by the performance monitor
         self.perf_dropped = 0
         self.perf_busy_s = 0.0
+        self._map_reset = False  # set by the console, done on the processing thread
+        self._world_snap = None
+        self._world_snap_t = 0.0
         self._apply_mount()
         self.perf = PerfMonitor(self, csv_path=perf_csv)
 
@@ -153,6 +168,7 @@ class EchoSense:
                 self.event("warning", src.error)
             self.processor.reset()
             self.health.reset()
+            self._floor_noted = False
             self._pinged_tracks.clear()
             self._contacts_seen = 0
             self._apply_mount()
@@ -248,6 +264,9 @@ class EchoSense:
         rng = self.cfg["ranges"][s.range]
         if self.recorder:
             self.recorder.write(frame)
+        if self._map_reset and self.processor.mapper is not None:
+            self._map_reset = False
+            self.processor.mapper.reset()
         res = self.processor.process(frame, range_limit=rng, report_off_path=s.report_off_path,
                                      ear_height=self.cfg["audio"]["ear_height"])
         self.last_result = res
@@ -262,13 +281,22 @@ class EchoSense:
             rep = res.reported
             if s.mode == "warning":
                 rep = [o for o in rep if o["r"] <= s.warning_distance]
-            for rank, o in enumerate(rep[: self.cfg["audio"]["max_cues"]]):
+            max_cues = min(self.cfg["audio"]["max_cues"], int(self.processor.sens.get("max_cues", 99)))
+            for rank, o in enumerate(rep[:max_cues]):
                 cues.append({**o, "rank": rank, "t_frame": frame.t_capture})
         if s.power and s.announce and not self.trainer.active and self.health.state != "blocked":
             self._auto_announce(res.reported, frame.t_capture)
         self.sonifier.range_limit = rng if not self.trainer.active else 4.0
         self.sonifier.set_cues(cues)
         self.cues = cues
+
+        self._check_pointing(frame.t_capture)
+        if self.processor.plane_auto and not self._floor_noted:
+            self._floor_noted = True
+            g = res.ground
+            self.event("warning", f"The floor is not where the mount settings say: the sensor looks about "
+                                  f"{g['height']:.2f} m high, tilted {g['pitch']:.0f} deg. Following it automatically; "
+                                  f"press \"Calibrate from floor\" to save it.")
 
         contacts = frame.extra.get("contacts", 0)
         if contacts > self._contacts_seen and self.sim:
@@ -360,6 +388,31 @@ class EchoSense:
             self.speech.say(ph[warn].format(battery=self.battery.percent), "alarm")
             self.logger.write("alert", state=warn, battery=self.battery.percent)
 
+    def _check_pointing(self, t: float):
+        """With a verified accelerometer: say so when the sensor points at the floor or the sky for a
+        second (strap slipped, device knocked or set down), once per episode."""
+        ang = self.processor.gravity.angles(t)
+        where = None
+        if ang is not None:
+            if ang["pitch"] < self.cfg["sensor"].get("pointing_floor_deg", -45.0):
+                where = "floor"
+            elif ang["pitch"] > self.cfg["sensor"].get("pointing_sky_deg", 25.0):
+                where = "sky"
+        if where != self._pointing:
+            self._pointing, self._pointing_since, self._pointing_said = where, t, False
+        elif where and not getattr(self, "_pointing_said", False) and t - self._pointing_since >= 1.0:
+            self._pointing_said = True
+            text = self.cfg["phrases"]["pointing_" + where]
+            self.event("warning", text)
+            self.logger.write("alert", state="pointing_" + where, pitch=ang["pitch"])
+            if self.settings.s.power:
+                self.speech.say(text, "limit")
+
+    def gravity_state(self) -> dict:
+        g = self.processor.gravity
+        t = self.last_result.t_capture if self.last_result is not None else 0.0
+        return {"status": g.status(), "device": getattr(self.source, "accel_status", None), "angles": g.angles(t)}
+
     # ------------------------------------------------------- what's ahead
     def _direction(self, az: float) -> str:
         ph = self.cfg["phrases"]
@@ -387,14 +440,24 @@ class EchoSense:
         return ". ".join(items) + "." if items else ph["describe_none"].format(range=rng)
 
     def _auto_announce(self, reported: list, t: float):
+        """Say "Person ahead" / "Vehicle left" when one appears. Only for something seen steadily
+        (about a quarter of a second, label settled), at most once per track, and the same thing in
+        the same direction is not repeated for 8 s even when the tracker loses and re-finds it."""
         ph = self.cfg["phrases"]
         for o in reported:
-            if o["label"] in ("person", "vehicle") and o["id"] not in self._announced and o["label_conf"] >= 0.6:
-                self._announced[o["id"]] = t
-                if t - self._last_announce > 3.0:
-                    self._last_announce = t
-                    self.speech.say(ph["announce"].format(label=SPOKEN[o["label"]], direction=self._direction(o["az"])))
-                    break
+            if (o["label"] not in ("person", "vehicle") or o["id"] in self._announced
+                    or o["label_conf"] < 0.6 or o.get("hits", 99) < 8):
+                continue
+            self._announced[o["id"]] = t
+            d = self._direction(o["az"])
+            last = self._label_said.get(o["label"])
+            if last is not None and t - last[0] < 8.0 and last[1] == d:
+                continue
+            if t - self._last_announce > 3.0:
+                self._last_announce = t
+                self._label_said[o["label"]] = (t, d)
+                self.speech.say(ph["announce"].format(label=SPOKEN[o["label"]], direction=d))
+                break
         if len(self._announced) > 200:
             self._announced = dict(list(self._announced.items())[-100:])
 
@@ -437,13 +500,13 @@ class EchoSense:
             "timings": res.timings, "valid_ratio": round(res.valid_ratio, 3), "ground": res.ground,
             "quality": round(self.health.quality, 3), "coverage": self.coverage(),
             "flip": getattr(src, "flip", None), "has_rgb": bool(getattr(src, "has_rgb", False)),
-            "depth_stats": self.processor.depth_stats,
+            "depth_stats": self.processor.depth_stats, "gravity": self.gravity_state(),
             "mount": {"height": self.processor.mount_height, "pitch": self.processor.mount_pitch},
             "intr": intr, "tracks": [t.to_dict(self.cfg["audio"]["ear_height"]) for t in res.tracks],
             "reported": [o["id"] for o in res.reported], "cues": [{k: c.get(k) for k in ("id", "kind", "r", "az", "el", "rank", "ttc", "r_urgent", "label", "label_conf", "memory")} for c in cues],
             "recognition": self.processor.recognizer is not None and self.processor.recognizer.available,
             "pose": frame.extra.get("pose"), "movers": frame.extra.get("movers"), "contacts": frame.extra.get("contacts", 0),
-            "scene_version": frame.extra.get("scene_version"),
+            "scene_version": frame.extra.get("scene_version"), "world": self._world_state(),
             "health": self.health.state, "battery": {"percent": self.battery.percent, "charging": self.battery.charging},
             "settings": self.settings.to_dict(), "range_m": self.cfg["ranges"][self.settings.s.range],
             "metrics": self.metrics(),
@@ -455,6 +518,24 @@ class EchoSense:
             "recording": self.recorder.path if self.recorder else None,
         }
         return {"state": state, "depth": mm}
+
+    def _world_state(self):
+        """The world map for the console: the map image about twice a second (it's the bulk of the
+        data), pose and status every packet."""
+        m = self.processor.mapper
+        if m is None:
+            return None
+        now = time.monotonic()
+        if self._world_snap is None or now - self._world_snap_t >= 0.5:
+            self._world_snap, self._world_snap_t = m.snapshot(), now
+            return self._world_snap
+        return {**m.state(), "trail": m.trail[-300:], "truth": m.truth_trail[-300:] or None}
+
+    def map_command(self, cmd: str):
+        if cmd == "reset":
+            self._map_reset = True
+            self._world_snap = None
+            self.event("info", "World map cleared")
 
     # ============================================================== colour
     def set_rgb_viewers(self, n: int):
@@ -585,17 +666,25 @@ class EchoSense:
             self._apply_near_mode()
         elif key in ("report_off_path", "announce"):
             self.settings.update(**{key: bool(value)})
+        elif key == "sensitivity":
+            if value not in SENSITIVITIES:
+                self.event("warning", f"unknown sensitivity {value}")
+                return
+            self.settings.update(sensitivity=value)
+            self.processor.set_sensitivity(value)
+            self.event("info", f"Sensitivity {value}")
         elif key == "warning_distance":
             self.settings.update(warning_distance=float(value))
         elif key in ("mount_height", "mount_pitch"):
-            self.settings.update(**{key: None if value is None else float(value)})
+            self.settings.update(**{key: None if value is None else float(value)}, fitting_checked=False)
             self._apply_mount()
         elif key == "calibrate_mount":
             g = self.processor.calibrate_floor()
             if g:
-                self.settings.update(mount_height=g["height"], mount_pitch=g["pitch"])
+                self.settings.update(mount_height=g["height"], mount_pitch=g["pitch"], fitting_checked=False)
                 self._apply_mount()
                 self.processor.reset()
+                self._floor_noted = False
                 self.event("info", f"Mount calibrated from the floor: {g['height']:.2f} m, {g['pitch']:.1f} deg")
             else:
                 self.event("warning", "Calibration needs a clear view of the floor")
@@ -663,9 +752,29 @@ class EchoSense:
             self.event("info", "Blind trial: point to the sound")
         elif cmd == "respond":
             tr = self.trainer.respond(msg["az"])
-            self.logger.write("training_trial", **tr)
+            self.logger.write("training_trial", **{
+                ("obstacle_kind" if key == "kind" else key): value for key, value in tr.items()
+            })
             self.event("training", f"Target {tr['target_az']:+.0f} deg, answered {tr['response_az']:+.0f} deg, "
                                    f"error {tr['error_deg']:.0f} deg", trial=tr)
+            return tr
+
+    def configure_fitting(self, values: dict):
+        from .device.supervision import number
+        head = number(values.get("head_height"), 0.4, 2.3)
+        ear = number(values.get("ear_height"), 0.3, head)
+        mount = number(values.get("mount_height"), 0.2, ear)
+        pitch = number(values.get("mount_pitch"), -40, 20)
+        if values.get("fitting_checked") is not True:
+            raise ValueError("Check the sensor fitting and blind zones before saving.")
+        self.settings.update(head_height=head, ear_height=ear, mount_height=mount,
+                             mount_pitch=pitch, fitting_checked=True)
+        self.cfg["audio"]["ear_height"] = ear
+        self.cfg["processing"]["user_height"] = head
+        self.cfg["processing"]["overhang_min_height"] = min(
+            self._overhang_default, max(0.2, ear - self.cfg["processing"]["head_margin"]))
+        self._apply_mount()
+        self.event("info", "Child fitting measurements saved. Check coverage before practice.")
 
     def sensor_spec(self) -> dict:
         return self.source.spec(self.cfg) if self.source else dict(self.cfg["sensor"])
@@ -673,7 +782,7 @@ class EchoSense:
     def coverage(self) -> dict:
         p = self.cfg["processing"]
         return coverage(self.sensor_spec(), self.processor.mount_height, self.processor.mount_pitch,
-                        head_height=1.7, corridor_half=p["corridor_half_width"])
+                        head_height=self.settings.s.head_height or 1.7, corridor_half=p["corridor_half_width"])
 
     def hello(self) -> dict:
         sim = self.sim

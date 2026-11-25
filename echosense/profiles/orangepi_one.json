@@ -20,7 +20,8 @@
     "prestride": 2,
     "confirm_frames": 2,
     "ransac_iterations": 24,
-    "hold_frames": 1
+    "hold_frames": 1,
+    "world_map": {"enabled": false, "_comment": "prototype, console only: costs CPU this board can't spare and doesn't change the cues yet"}
   },
   "audio": {
     "driver": "local",

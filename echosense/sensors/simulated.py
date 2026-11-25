@@ -42,12 +42,18 @@ class SimulatedKinect(DepthSource):
         self.blocked = False
         self.head_bob = True
         self.autowalk = False
+        self.bob_deg = 1.5  # chest pitch swing while walking (a loose strap or a brisk walk: 3-5 deg)
+        # accelerometer (the Kinect v1 has one): reading = gravity reaction in the sensor's own axes, whose
+        # signs relative to the depth image are not known to the pipeline (it has to learn them)
+        self.accel = self.preset == "kinect_v1"
+        self.accel_signs = (1.0, -1.0, 1.0)
+        self._acc_rng = np.random.default_rng(None if seed is None else seed + 1)
         self.want_rgb = False
         self._rgb = None
         self.contacts: list[dict] = []
         self._contact_last: dict[str, float] = {}
         self._thread: threading.Thread | None = None
-        self._scene_lock = threading.Lock()
+        self._scene_lock = threading.RLock()  # re-entrant: the sim thread holds it in _step, and auto-walk resets the scene at the route end
         self.load_scene(scene)
 
     # ---------------------------------------------------------------- scene
@@ -190,14 +196,30 @@ class SimulatedKinect(DepthSource):
         bob_y = bob_p = 0.0
         if self.head_bob and moving:
             bob_y = 0.015 * math.sin(2 * self.step_phase)
-            bob_p = 1.5 * math.sin(self.step_phase)
+            bob_p = self.bob_deg * math.sin(self.step_phase)
         pitch = math.radians(self.mount_pitch + bob_p)
         R = camera_rotation(self.yaw, pitch)
         o = np.array([self.x + self.SENSOR_FORWARD * math.sin(self.yaw), self.mount_height + bob_y,
                       self.z + self.SENSOR_FORWARD * math.cos(self.yaw)], np.float32)
         return o, R, pitch
 
+    def _accel(self, pitch) -> tuple:
+        R = camera_rotation(self.yaw, pitch)
+        up_cam = R.T @ np.array([0.0, 1.0, 0.0])
+        a = 9.80665 * up_cam
+        moving = self.autowalk or any(abs(v) > 1e-3 for v in self.move.values())
+        if moving and self.head_bob:
+            a = a + 2.5 * math.sin(2 * self.step_phase) * up_cam  # the chest rises and falls each step
+        a = a + self._acc_rng.normal(0.0, 0.3, 3)
+        return tuple(float(v) for v in a * np.asarray(self.accel_signs))
+
     def _extra(self, o, pitch) -> dict:
+        out = self._extra_base(o, pitch)
+        if self.accel:
+            out["accel"] = self._accel(pitch)
+        return out
+
+    def _extra_base(self, o, pitch) -> dict:
         return {"pose": {"x": round(float(o[0]), 4), "z": round(float(o[2]), 4), "yaw": round(math.degrees(self.yaw), 3),
                          "height": round(float(o[1]), 4), "pitch": round(math.degrees(pitch), 3),
                          "body_x": round(self.x, 4), "body_z": round(self.z, 4)},

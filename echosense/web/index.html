@@ -16,6 +16,8 @@
     <span>Echo-Sense</span><small id="profile">console</small>
   </div>
   <div class="seg" id="sources" role="group" aria-label="Depth source"></div>
+  <a href="/parents" style="color:var(--accent);white-space:nowrap">Parent space</a>
+  <button id="logout" disabled>Sign out</button><span id="account-message" role="status"></span>
   <div class="pills">
     <span class="pill" id="p-health" title="Sensor health">—</span>
     <span class="pill" id="p-fps" title="Depth frames per second">— fps</span>
@@ -68,6 +70,19 @@
         <div><h3>Cue map</h3><canvas id="radar" width="220" height="212"></canvas></div>
       </div>
       <div class="meta" id="frame-meta"></div>
+    </div>
+
+    <div class="card" id="map-card" hidden>
+      <h3>World map <small>prototype: surroundings remembered while walking</small></h3>
+      <canvas id="worldmap" width="320" height="320" title="North-up map around you. Teal line: where the map thinks you walked. Dashed grey: the simulator's true path."></canvas>
+      <div class="legend wm-legend">
+        <span><i style="background:var(--k-body)"></i>body height</span>
+        <span><i style="background:var(--k-low)"></i>low</span>
+        <span><i style="background:var(--k-drop)"></i>drop-off</span>
+        <span><i class="wm-line"></i>estimated path</span>
+        <span id="wm-truth-key" hidden><i class="wm-line truth"></i>true path (sim)</span>
+      </div>
+      <div class="inline"><button id="map-reset">Clear map</button><span class="meta" id="map-meta">—</span></div>
     </div>
 
     <div class="card" id="cam-card">
@@ -124,10 +139,12 @@
 
     <div class="card">
       <h3>Fitting &amp; calibration <small>caregiver</small></h3>
-      <label class="field">Mount height <input type="range" id="m-height" min="0.9" max="1.6" step="0.01"><output id="o-height"></output></label>
-      <label class="field">Mount tilt <input type="range" id="m-pitch" min="-35" max="10" step="0.5"><output id="o-pitch"></output></label>
+      <label class="field">Mount height <input type="range" id="m-height" min="0.5" max="1.8" step="0.01"><output id="o-height"></output></label>
+      <label class="field">Mount tilt <input type="range" id="m-pitch" min="-40" max="20" step="0.5"><output id="o-pitch"></output></label>
       <div class="inline"><button id="m-cal">Calibrate from floor</button><span class="meta" id="ground-est"></span></div>
       <div class="coverage" id="coverage"></div>
+      <div class="field"><span>Sensitivity</span>
+        <div class="seg small" id="sens" title="How sure Echo-Sense must be before it sounds an obstacle. Low: fewer, steadier cues (one at a time). High: the earliest cues, more false alarms."><button data-sens="low">Low</button><button data-sens="normal">Normal</button><button data-sens="high">High</button></div></div>
       <div class="field"><span>Detection zone</span>
         <div class="seg small" id="zone"><button data-zone="corridor">Walking corridor</button><button data-zone="fov">Full field of view</button></div></div>
       <div class="checks">
@@ -161,6 +178,7 @@
   </aside>
 </main>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="/static/auth.js" defer></script>
 <script type="module" src="/static/app.js"></script>
 </body>
 </html>

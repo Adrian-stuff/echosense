@@ -6,3 +6,9 @@ logs/
 reports/
 *.esd
 .claude/test-settings.json
+
+# offline dependency wheels made by ./run.sh --prepare
+wheels/
+
+# Device-local account credentials and sessions
+accounts.sqlite3*

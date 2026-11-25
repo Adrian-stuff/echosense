@@ -47,6 +47,11 @@ DEFAULTS: dict = {
         "flip_horizontal": True,
         "kinect2_pipeline": "auto",  # auto | cl | gl | cpu
         "kinect2_bridge": "",  # path to echosense-kinect2, empty = search
+        # Kinect v1 accelerometer: auto supports 1414 and 1473 (when audios.bin is installed).
+        # false disables it; true forces a combined camera/motor attempt.
+        "kinect1_accelerometer": "auto",
+        "pointing_floor_deg": -45.0,  # accelerometer tilt beyond which "pointing at the floor" is said
+        "pointing_sky_deg": 25.0,
     },
     "processing": {
         "stride": 3,  # pixel subsampling before 3D projection
@@ -56,6 +61,7 @@ DEFAULTS: dict = {
         "flying_pixel_filter": True,
         "column_estimator": True,
         "recognition": True,  # depth-only object recognition (processing/objects.py)
+        "label_min_conf": 0.5,  # name an obstacle only when the recogniser is at least this sure
         "object_model": "",  # empty = the shipped model
         "ground_tolerance": 0.08,  # |height| below this is ground (m)
         "drop_threshold": 0.12,  # below the ground plane by this = drop-off
@@ -74,6 +80,7 @@ DEFAULTS: dict = {
         "ground_smoothing": 0.35,
         "confirm_frames": 3,  # false-positive suppression
         "drop_time": 0.35,  # forget a track unseen for this long (s)
+        "rank_hysteresis": 0.3,  # the lead cue changes only when another is this much (m) more urgent
         "assoc_gate": 0.6,
         "smoothing": 0.5,
         "velocity_gain": 0.15,
@@ -84,8 +91,27 @@ DEFAULTS: dict = {
         "low_max_height": 0.45,  # nothing above this = low / tripping hazard
         "priority_bonus": 0.25,  # head-level and drop-offs reported earlier
         "report_off_path": False,
+        # rolling top-down map of the surroundings, positioned by scan matching (processing/worldmap.py).
+        # Prototype: shown in the console, not used for the audio cues yet. Other keys: see worldmap.DEFAULTS
+        "world_map": {"enabled": True},
     },
     "ranges": {"near": 1.5, "medium": 2.5, "far": 4.0},
+    # user setting "sensitivity": how much evidence an obstacle needs before it is cued.
+    #   confirm_extra  frames on top of processing.confirm_frames
+    #   min_age        and at least this long since first seen (s), so slow boards aren't faster to cue
+    #   hit_ratio      share of frames since first seen in which it was actually detected
+    #   cluster_scale  multiplies min_cluster_points (small, sparse blobs are mostly noise)
+    #   ground_slope   floor tolerance added per metre beyond 2.5 m (floor fit errors grow with range)
+    #   corridor_scale narrows the walking corridor (fewer cues for things beside the path)
+    #   max_cues       obstacles sounding at once
+    "sensitivity_levels": {
+        "low": {"confirm_extra": 3, "min_age": 0.25, "hit_ratio": 0.8, "cluster_scale": 2.0, "ground_slope": 0.03,
+                "corridor_scale": 0.85, "max_cues": 1},
+        "normal": {"confirm_extra": 1, "min_age": 0.1, "hit_ratio": 0.7, "cluster_scale": 1.35, "ground_slope": 0.02,
+                   "corridor_scale": 1.0, "max_cues": 2},
+        "high": {"confirm_extra": 0, "min_age": 0.0, "hit_ratio": 0.0, "cluster_scale": 1.0, "ground_slope": 0.0,
+                 "corridor_scale": 1.0, "max_cues": 2},
+    },
     "sim": {"sensor_preset": "kinect_v2"},  # see sensors/presets.py: compare wider-FOV sensors
     "audio": {
         "sample_rate": 48000,
@@ -125,6 +151,8 @@ DEFAULTS: dict = {
         "sensor_blocked": "Sensor blocked. Use your cane.",
         "sensor_no_data": "Sensor not responding. Use your cane.",
         "sensor_degraded": "Depth sensing degraded. Take extra care.",
+        "pointing_floor": "Sensor is pointing at the floor. Check the strap.",
+        "pointing_sky": "Sensor is pointing up. Check the strap.",
         "status": "{sensor}. Range {range}. {mode} mode. {battery} percent battery.",
         "training_on": "Training mode.",
         "training_off": "Training mode off.",

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#10171c">
+  <title>Sign in · EchoSense</title>
+  <link rel="stylesheet" href="/static/parent.css">
+  <link rel="stylesheet" href="/static/auth.css">
+</head>
+<body class="auth-page">
+  <main class="auth-layout">
+    <section class="auth-story" aria-label="EchoSense parent space">
+      <a class="brand" href="/login"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 20v-8m6 14V6m8 17V9m6 11v-8"/></svg><span>echo<span class="brand-light">sense</span></span></a>
+      <div><h1>A little more confidence.<br>A little more independence.</h1><p>A space to support their practice, celebrate progress, and keep the moments that matter.</p></div>
+      <p class="auth-foot">Your EchoSense. Your family’s space.</p>
+    </section>
+    <section class="auth-form-panel">
+      <div class="auth-form-wrap">
+        <h2 id="auth-title">Welcome back.</h2>
+        <p id="auth-description">Sign in to your EchoSense parent account.</p>
+        <p id="auth-message" class="auth-message" role="status" aria-live="polite">Connecting to your device…</p>
+        <form id="login-form" hidden>
+          <div id="setup-code-field" hidden><label class="field"><span id="code-label">Device setup code</span><input name="code" id="setup-code" maxlength="128" autocomplete="off" spellcheck="false" aria-describedby="setup-help"></label><p id="setup-help" class="fine">Find this code in the terminal running EchoSense. It lets the device owner create the first account.</p></div>
+          <label class="field">Username<input id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="64" required></label>
+          <label class="field">Password<input id="password" name="password" type="password" autocomplete="current-password" maxlength="128" required aria-describedby="password-help"></label>
+          <p id="password-help" class="fine" hidden>Use a passphrase of 15–128 characters. Spaces are welcome.</p>
+          <div id="confirm-field" hidden><label class="field">Confirm password<input id="confirm-password" name="confirm" type="password" autocomplete="new-password" maxlength="128"></label></div>
+          <label class="show-password"><input id="show-password" type="checkbox"> Show password</label>
+          <button class="primary auth-submit" id="auth-submit" type="submit">Sign in</button>
+        </form>
+        <button id="invite-toggle" class="text-button" type="button" hidden>Use a caregiver invitation</button>
+        <details id="recovery-help"><summary>Forgot your password?</summary><p>On the EchoSense device, run <code>echosense reset-password</code> in the terminal. You’ll be prompted for a new password. This signs out all sessions.</p></details>
+        <p class="fine auth-local">Your account is stored on this EchoSense device. Saved clips and training notes stay in your browser.</p>
+      </div>
+    </section>
+  </main>
+  <script src="/static/auth.js" defer></script>
+</body>
+</html>

@@ -25,7 +25,7 @@ from pathlib import Path
 import numpy as np
 
 from ..config import load_config
-from ..processing.objects import CLASSES, FEATURES, MODEL_PATH, DecisionTree
+from ..processing.objects import CLASSES, FEATURES, MODEL_PATH, DecisionTree, Forest
 
 S_OFF = 0.12
 
@@ -82,14 +82,16 @@ def _rand_object(rng, cls, x, z, i):
              "y0": U(1.2, 1.75), "yaw": U(-30, 30), "material": rng.choice(["metal", "wood", "fabric"]), "class": cls}]
 
 
-def random_scene(rng, n_objects):
+def random_scene(rng, n_objects, clutter: bool = False):
+    """``clutter``: objects close together and partly outside the view, as on a real street."""
     objs, placed = [], []
+    sep, half = (0.8, 42) if clutter else (1.6, 30)
     for i in range(n_objects):
         cls = CLASSES[rng.integers(len(CLASSES))]
         for _ in range(20):
-            d, az = rng.uniform(0.9, 4.0), math.radians(rng.uniform(-30, 30))
+            d, az = rng.uniform(0.9, 4.3), math.radians(rng.uniform(-half, half))
             x, z = d * math.sin(az), S_OFF + d * math.cos(az)
-            if all(math.hypot(x - px, z - pz) > 1.6 for px, pz in placed):
+            if all(math.hypot(x - px, z - pz) > sep for px, pz in placed):
                 break
         else:
             continue
@@ -108,8 +110,10 @@ def _match(world, x, z):
     return best
 
 
-def harvest(world_scene, cfg, rng, frames=8, sun=0.0, autowalk=False, seconds=None, skip_suppressed=False):
-    """Run the pipeline over a scene; return (features, label) for each confirmed, labelled obstacle."""
+def harvest(world_scene, cfg, rng, frames=8, sun=0.0, autowalk=False, seconds=None, skip_suppressed=False,
+            walk=False):
+    """Run the pipeline over a scene; return (features, label) for each confirmed, labelled obstacle.
+    ``walk``: walk slowly forward, turning a little, with chest bob (views change as on the device)."""
     from ..processing.pipeline import DepthProcessor
     from ..sensors.base import DepthFrame
     from ..sensors.simulated import SimulatedKinect
@@ -117,12 +121,15 @@ def harvest(world_scene, cfg, rng, frames=8, sun=0.0, autowalk=False, seconds=No
     sim = SimulatedKinect(cfg, world_scene, seed=int(rng.integers(1 << 30)))
     sim.sun = sun
     sim.autowalk = autowalk
+    if walk:
+        sim.move = {"f": float(rng.uniform(0.4, 0.9)), "s": 0.0, "turn": float(rng.uniform(-0.35, 0.35))}
+        sim.head_bob, sim.bob_deg = True, float(rng.uniform(1.0, 4.0))
     proc = DepthProcessor(cfg)
     rows = []
     n = int(seconds * 30) if seconds else frames
     for f in range(n):
         t = f / 30
-        if autowalk:
+        if autowalk or walk:
             sim._step(1 / 30, t)
         depth, extra = sim.capture(t)
         res = proc.process(DepthFrame(depth, t, f + 1, sim.intrinsics, "sim", extra), 4.5, True)
@@ -153,11 +160,20 @@ def _job(args):
     rng = np.random.default_rng(seed)
     rows = []
     for _ in range(n_scenes):
-        sc = random_scene(rng, int(rng.integers(1, 4)))
-        cfg["sensor"]["mount_height"] = float(rng.uniform(1.12, 1.38))
-        cfg["sensor"]["mount_pitch_deg"] = float(rng.uniform(-15, -5))
+        clutter = rng.random() < 0.5
+        sc = random_scene(rng, int(rng.integers(2, 6) if clutter else rng.integers(1, 4)), clutter)
+        # chest straps vary, and a Kinect v1 is often tried on a desk or in the hand first
+        if rng.random() < 0.7:
+            cfg["sensor"]["mount_height"] = float(rng.uniform(1.1, 1.4))
+            cfg["sensor"]["mount_pitch_deg"] = float(rng.uniform(-18, -4))
+        else:
+            cfg["sensor"]["mount_height"] = float(rng.uniform(0.7, 1.55))
+            cfg["sensor"]["mount_pitch_deg"] = float(rng.uniform(-25, 5))
         sun = float(rng.choice([0.0, 0.0, 0.2, 0.5, 0.8]))
-        rows += [(f, l) for f, l, _ in harvest(sc, cfg, rng, frames=8, sun=sun)]
+        if rng.random() < 0.5:
+            rows += [(f, l) for f, l, _ in harvest(sc, cfg, rng, sun=sun, walk=True, seconds=1.6)]
+        else:
+            rows += [(f, l) for f, l, _ in harvest(sc, cfg, rng, frames=8, sun=sun)]
     return rows
 
 
@@ -186,13 +202,20 @@ def run(args):
     for i in range(28):
         preset, stride = configs[i % len(configs)]
         jobs.append((cfg, seed + i, jobs_per, preset, stride))
-    print(f"Generating {jobs_per * 28} random scenes on {os.cpu_count()} cores (Kinect v2 + v1, strides 3/4/6) ...")
-    t0 = time.time()
-    rows = []
-    with mp.get_context("spawn").Pool(max(1, (os.cpu_count() or 2) - 1)) as pool:
-        for r in pool.imap_unordered(_job, jobs):
-            rows += r
-    print(f"  {len(rows)} labelled obstacles in {time.time() - t0:.0f} s")
+    cache = Path(args.cache) if getattr(args, "cache", None) else None
+    if cache is not None and cache.exists():
+        rows = json.loads(cache.read_text())
+        print(f"  {len(rows)} labelled obstacles from {cache}")
+    else:
+        print(f"Generating {jobs_per * 28} random scenes on {os.cpu_count()} cores (Kinect v2 + v1, strides 3/4/6) ...")
+        t0 = time.time()
+        rows = []
+        with mp.get_context("spawn").Pool(max(1, (os.cpu_count() or 2) - 1)) as pool:
+            for r in pool.imap_unordered(_job, jobs):
+                rows += r
+        print(f"  {len(rows)} labelled obstacles in {time.time() - t0:.0f} s")
+        if cache is not None:
+            cache.write_text(json.dumps([[list(map(float, f)), l] for f, l in rows]))
     if args.extra:
         with open(args.extra) as f:
             for row in csv.DictReader(f):
@@ -206,7 +229,10 @@ def run(args):
     tr_i, te_i = idx[:cut], idx[cut:]
     counts = np.bincount(y[tr_i], minlength=len(CLASSES))
     w = (counts.sum() / np.maximum(counts, 1) / len(CLASSES))[y[tr_i]]  # balance classes
-    tree = DecisionTree(max_depth=args.depth, min_leaf=5).fit(X[tr_i], y[tr_i], w)
+    if getattr(args, "trees", 1) > 1:
+        tree = Forest.fit(X[tr_i], y[tr_i], w, n_trees=args.trees, max_depth=args.depth)
+    else:
+        tree = DecisionTree(max_depth=args.depth, min_leaf=5).fit(X[tr_i], y[tr_i], w)
     acc_te, cm_te = _scores(y[te_i], tree.predict(X[te_i]), len(CLASSES))
     out = Path(args.model or MODEL_PATH)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -237,8 +263,9 @@ def run(args):
     us = (time.perf_counter() - t) / min(2000, len(X)) * 1e6
 
     rep = [f"# Object recogniser (depth only) — {datetime.now():%Y-%m-%d %H:%M}", "",
-           f"Decision tree, depth {args.depth}, {len(tree.nodes)} nodes, {size_kb:.1f} KB, {us:.0f} µs per obstacle on this machine.",
-           f"Trained on {len(tr_i)} obstacles from {jobs_per * 28} random simulator scenes (Kinect v2 and v1 models).", "",
+           f"{'Random forest of ' + str(args.trees) + ' trees' if getattr(args, 'trees', 1) > 1 else 'Decision tree'}, depth {args.depth}, {len(tree.nodes)} nodes, {size_kb:.1f} KB, {us:.0f} µs per obstacle on this machine.",
+           f"Trained on {len(tr_i)} obstacles from {jobs_per * 28} random simulator scenes (Kinect v2 and v1 models; "
+           f"half cluttered, half walking with chest bob, mounts 0.7-1.55 m / -25 to +5 deg).", "",
            f"**Held-out random scenes: {acc_te * 100:.1f}% accuracy** ({len(te_i)} obstacles)", "",
            "| true \\ predicted | " + " | ".join(CLASSES) + " | recall |", "|---|" + "---|" * (len(CLASSES) + 1)]
     for i, c in enumerate(CLASSES):

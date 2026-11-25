@@ -451,10 +451,21 @@ class World:
 
 
 class CameraModel:
-    """Pinhole model + Kinect v2 style sensor noise."""
+    """Pinhole model + sensor noise.
 
-    def __init__(self, width, height, fx, fy, cx, cy, min_depth=0.5, max_depth=4.5, noise=(0.0015, 0.0008)):
+    ``noise_model`` "tof" (Kinect v2, Azure): independent per-pixel noise. "structured_light"
+    (Kinect v1, Xbox 360): depth comes from disparity measured in 1/8 pixel steps over a 7.5 cm
+    baseline, so it is quantised into terraces that grow with z squared (about 2.6 cm at 3 m,
+    4.6 cm at 4 m), and the block-matching window makes the error spatially correlated: whole
+    patches of a flat floor sit a step high or low together. Independent pixel noise is averaged
+    away by downsampling; these patches are not, and they are what makes a real Kinect v1 report
+    obstacles on an empty floor.
+    """
+
+    def __init__(self, width, height, fx, fy, cx, cy, min_depth=0.5, max_depth=4.5, noise=(0.0015, 0.0008),
+                 noise_model="tof"):
         self.noise_a, self.noise_b = float(noise[0]), float(noise[1])
+        self.noise_model = noise_model
         self.width, self.height = int(width), int(height)
         self.fx, self.fy, self.cx, self.cy = float(fx), float(fy), float(cx), float(cy)
         self.min_depth, self.max_depth = float(min_depth), float(max_depth)
@@ -464,7 +475,7 @@ class CameraModel:
     @classmethod
     def from_config(cls, s: dict) -> "CameraModel":
         return cls(s["width"], s["height"], s["fx"], s["fy"], s["cx"], s["cy"], s["min_depth"], s["max_depth"],
-                   s.get("noise", (0.0015, 0.0008)))
+                   s.get("noise", (0.0015, 0.0008)), s.get("noise_model", "tof"))
 
     def window(self, lo, hi, o, R):
         """Image-space bounding rectangle (v0, v1, u0, u1) of a world AABB, or None."""
@@ -492,6 +503,16 @@ class CameraModel:
         z = np.where(hit, zbuf, 0.0).astype(np.float32)
         sigma = (self.noise_a + self.noise_b * z * z) * MAT_NOISE[mat] * (1.0 + 2.0 * sun)
         z += rng.standard_normal((H, W), dtype=np.float32) * sigma
+        if self.noise_model == "structured_light":
+            step = z * z * np.float32(1.0 / (8 * 0.075 * self.fx))  # 1/8 px of disparity, in metres of depth
+            # correlated error: a coarse random field (about 9 px cells, the matching window) blurred
+            # a little, so patches move together
+            c = 9
+            cells = rng.standard_normal((H // c + 2, W // c + 2)).astype(np.float32)
+            cells = (cells + np.roll(cells, 1, 0) + np.roll(cells, 1, 1)) / np.float32(1.7)
+            field = np.repeat(np.repeat(cells, c, 0), c, 1)[:H, :W]
+            z += field * step * np.float32(0.6) * MAT_NOISE[mat]
+            z = np.round(z / np.maximum(step, 1e-4)) * step  # disparity terraces
         z[~hit] = 0.0
         zr = (z / self.max_depth) ** 2
         p_drop = MAT_DROPOUT[mat] + MAT_RANGE_DROP[mat] * zr
