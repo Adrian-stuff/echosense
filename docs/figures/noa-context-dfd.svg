@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1380" height="536" viewBox="0 0 1380 536" role="img" aria-labelledby="title desc">
+  <title id="title">Figure 3. Context-level diagram of NOA by biped.ai</title>
+  <desc id="desc">Reconstruction from biped.ai public documentation. The wearer sends button commands, app settings, and destinations to the NOA vest and companion app. The wearer receives spatial obstacle alerts, spoken directions, and scene descriptions through paired headphones. Visible surroundings enter through the vest cameras. The system uses Google Maps and Google Gemini for routing and AI features.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L10 4 L0 8 Z" fill="#20242a"/>
+    </marker>
+    <style>
+      text { font-family: Arial, Helvetica, sans-serif; fill: #20242a; }
+      .figure { font: bold 24px Georgia, serif; }
+      .title { font: italic 30px Georgia, serif; }
+      .note { fill: #4b545e; font-size: 15px; }
+      .box { fill: #fff; stroke: #454b53; stroke-width: 1.6; }
+      .flow { fill: none; stroke: #20242a; stroke-width: 1.6; marker-end: url(#arrow); }
+      .label { font-size: 15px; text-anchor: middle; }
+      .node { font-size: 19px; text-anchor: middle; }
+    </style>
+  </defs>
+  <rect width="1380" height="536" fill="#fff"/>
+  <text x="48" y="49" class="figure">Figure 3</text>
+  <text x="48" y="88" class="title">Context-level diagram of NOA by biped.ai</text>
+  <text x="48" y="120" class="note">Reconstructed from public biped.ai documentation</text>
+
+  <rect x="48" y="225" width="214" height="142" class="box"/>
+  <text x="155" y="292" class="node">Blind or low-vision<tspan x="155" dy="23">wearer</tspan></text>
+
+  <rect x="518" y="196" width="340" height="188" rx="11" class="box"/>
+  <path d="M518 224 V207 Q518 196 529 196 H847 Q858 196 858 207 V224 Z" fill="#e8ebee"/>
+  <path d="M518 224 H858" stroke="#454b53" stroke-width="1.6"/>
+  <text x="688" y="216" text-anchor="middle" font-size="15" font-weight="700">0</text>
+  <text x="688" y="280" class="node">NOA mobility system<tspan x="688" dy="24">Vest, companion app,</tspan><tspan x="688" dy="24">and paired audio output</tspan></text>
+
+  <rect x="1116" y="225" width="216" height="142" class="box"/>
+  <text x="1224" y="271" class="node">External services<tspan x="1224" dy="24">Google Maps</tspan><tspan x="1224" dy="24">Google Gemini</tspan></text>
+
+  <path d="M262 250 H518" class="flow"/>
+  <text x="390" y="240" class="label">Button commands</text>
+  <path d="M262 292 H518" class="flow"/>
+  <text x="390" y="282" class="label">App settings and destinations</text>
+  <path d="M518 350 H262" class="flow"/>
+  <text x="390" y="324" class="label">Spatial alerts, spoken directions<tspan x="390" dy="17">and scene descriptions</tspan></text>
+
+  <path d="M858 265 H1116" class="flow"/>
+  <text x="987" y="255" class="label">Routing and AI requests</text>
+  <path d="M1116 336 H858" class="flow"/>
+  <text x="987" y="326" class="label">Route and AI results</text>
+
+  <rect x="544" y="435" width="288" height="58" class="box"/>
+  <text x="688" y="471" class="node">Physical surroundings</text>
+  <path d="M688 435 V384" class="flow"/>
+  <text x="705" y="414" font-size="15">Visual input to vest cameras</text>
+  <text x="48" y="518" class="note">Service arrows represent functional exchanges. They do not specify network paths or data payloads.</text>
+</svg>

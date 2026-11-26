@@ -1,133 +1,119 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1520" height="645" viewBox="0 0 1520 645" role="img" aria-labelledby="title desc">
-<title id="title">Comparison of EchoSense and related assistive tools</title><desc id="desc">Table comparing purpose, interface, obstacle sensing, feedback, route guidance, practice, and caregiver records for five tools. ND means not documented in the cited materials.</desc>
-<defs><marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L10 4 L0 8 Z" fill="#20242a"/></marker></defs>
-<rect width="1520" height="645" fill="white"/>
-<text x="48" y="49" text-anchor="start" font-family="Georgia,serif" font-size="24" font-weight="700" font-style="normal" fill="#20242a">Table 1</text>
-<text x="48" y="88" text-anchor="start" font-family="Georgia,serif" font-size="30" font-weight="400" font-style="italic" fill="#20242a">Comparison of EchoSense and related assistive tools</text>
-<rect x="38" y="120" width="159" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
-<text x="50" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">System</text>
-<rect x="197" y="120" width="191" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
-<text x="209" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Primary focus</text>
-<rect x="388" y="120" width="203" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
-<text x="400" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Form and interface</text>
-<rect x="591" y="120" width="193" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
-<text x="603" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Obstacle sensing</text>
-<rect x="784" y="120" width="206" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
-<text x="796" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">User feedback</text>
-<rect x="990" y="120" width="139" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
-<text x="1002" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Route guidance</text>
-<rect x="1129" y="120" width="166" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
-<text x="1141" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Practice tracking</text>
-<rect x="1295" y="120" width="187" height="46" rx="0" fill="#e8ebee" stroke="#454b53" stroke-width="1.6"/>
-<text x="1307" y="148" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="700" font-style="normal" fill="#20242a">Caregiver records</text>
-<rect x="38" y="166" width="159" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
-<text x="50" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">EchoSense</text>
-<text x="50" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">prototype</text>
-<rect x="197" y="166" width="191" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
-<text x="209" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Obstacle assistance</text>
-<text x="209" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and supervised practice</text>
-<rect x="388" y="166" width="203" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
-<text x="400" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Chest-mounted Kinect,</text>
-<text x="400" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">local web dashboard</text>
-<rect x="591" y="166" width="193" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
-<text x="603" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Depth-based obstacle</text>
-<text x="603" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and drop-off cues</text>
-<rect x="784" y="166" width="206" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
-<text x="796" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Spatial tones and</text>
-<text x="796" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">spoken alerts</text>
-<rect x="990" y="166" width="139" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
-<text x="1002" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">No</text>
-<rect x="1129" y="166" width="166" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
-<text x="1141" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Direction trials,</text>
-<text x="1141" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">goals and reports</text>
-<rect x="1295" y="166" width="187" height="66" rx="0" fill="#f1f4f6" stroke="#454b53" stroke-width="1.6"/>
-<text x="1307" y="195" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Local clips, notes</text>
-<text x="1307" y="213" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and ZIP backup</text>
-<rect x="38" y="232" width="159" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="50" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">NOA by</text>
-<text x="50" y="279" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">biped.ai [1]</text>
-<rect x="197" y="232" width="191" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="209" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Wearable mobility</text>
-<text x="209" y="279" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">assistance</text>
-<rect x="388" y="232" width="203" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="400" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Camera-equipped</text>
-<text x="400" y="279" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">wearable and headphones</text>
-<rect x="591" y="232" width="193" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="603" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Camera-based</text>
-<text x="603" y="279" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">obstacle detection</text>
-<rect x="784" y="232" width="206" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="796" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Spatial obstacle sounds</text>
-<text x="796" y="279" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and voice guidance</text>
-<rect x="990" y="232" width="139" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1002" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">GPS directions</text>
-<rect x="1129" y="232" width="166" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1141" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
-<rect x="1295" y="232" width="187" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1307" y="261" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
-<rect x="38" y="298" width="159" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="50" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">WeWALK</text>
-<text x="50" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">Smart Cane 2 [2]</text>
-<rect x="197" y="298" width="191" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="209" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Smart cane mobility</text>
-<text x="209" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and wayfinding</text>
-<rect x="388" y="298" width="203" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="400" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Electronic white cane</text>
-<text x="400" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and companion app</text>
-<rect x="591" y="298" width="193" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="603" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Above-chest sensor</text>
-<text x="603" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">detection</text>
-<rect x="784" y="298" width="206" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="796" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Audio and</text>
-<text x="796" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">vibration alerts</text>
-<rect x="990" y="298" width="139" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1002" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Via companion</text>
-<text x="1002" y="345" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">app</text>
-<rect x="1129" y="298" width="166" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1141" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
-<rect x="1295" y="298" width="187" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1307" y="327" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
-<rect x="38" y="364" width="159" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="50" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">Microsoft</text>
-<text x="50" y="411" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">Seeing AI [3]</text>
-<rect x="197" y="364" width="191" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="209" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Text reading and</text>
-<text x="209" y="411" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">scene description</text>
-<rect x="388" y="364" width="203" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="400" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Phone camera app</text>
-<rect x="591" y="364" width="193" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="603" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND for real-time</text>
-<text x="603" y="411" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">obstacle alerts</text>
-<rect x="784" y="364" width="206" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="796" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Spoken text and</text>
-<text x="796" y="411" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">scene descriptions</text>
-<rect x="990" y="364" width="139" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1002" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
-<rect x="1129" y="364" width="166" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1141" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
-<rect x="1295" y="364" width="187" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1307" y="393" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
-<rect x="38" y="430" width="159" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="50" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" font-style="normal" fill="#20242a">Lazarillo [4]</text>
-<rect x="197" y="430" width="191" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="209" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Accessible wayfinding</text>
-<text x="209" y="477" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">and exploration</text>
-<rect x="388" y="430" width="203" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="400" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Phone GPS app</text>
-<rect x="591" y="430" width="193" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="603" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND for nearby</text>
-<text x="603" y="477" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">obstacle alerts</text>
-<rect x="784" y="430" width="206" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="796" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Spoken directions and</text>
-<text x="796" y="477" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">place announcements</text>
-<rect x="990" y="430" width="139" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1002" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">Turn-by-turn</text>
-<text x="1002" y="477" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">routes</text>
-<rect x="1129" y="430" width="166" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1141" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
-<rect x="1295" y="430" width="187" height="66" rx="0" fill="white" stroke="#454b53" stroke-width="1.6"/>
-<text x="1307" y="459" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#20242a">ND</text>
-<text x="38" y="528" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="16" font-weight="400" font-style="normal" fill="#4b545e">ND = not documented in the cited materials. This comparison describes features and does not rank detection performance.</text>
-<text x="38" y="559" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#4b545e">[1] biped.ai NOA product page and mobility guide.  [2] WeWALK Smart Cane 2 manufacturer manual.</text>
-<text x="38" y="584" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#4b545e">[3] Microsoft Seeing AI product overview.  [4] Lazarillo official app overview.</text>
-<text x="38" y="620" text-anchor="start" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="400" font-style="normal" fill="#4b545e">EchoSense entries describe the implemented prototype. Source links accompany the editable table.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1520" height="545" viewBox="0 0 1520 545" role="img" aria-labelledby="title desc">
+<title id="title">Table 1. Comparison of EchoSense and related assistive tools</title>
+<desc id="desc">✓ = documented or implemented. ✗ = unavailable in the EchoSense prototype or unverified in the cited materials for the other tools. EchoSense prototype: Detect nearby obstacles, Play spatial obstacle alerts, Log supervised practice results, Record caregiver review clips, Export practice reports, Restore records from a backup. NOA by biped.ai [1]: Detect nearby obstacles, Play spatial obstacle alerts, Give turn-by-turn route directions, Read printed text aloud. WeWALK Smart Cane 2 [2]: Detect nearby obstacles, Give turn-by-turn route directions. Microsoft Seeing AI [3]: Read printed text aloud. Lazarillo [4]: Give turn-by-turn route directions.</desc>
+<style>text{fill:#20242a;font-family:Arial,Helvetica,sans-serif}.figure{font:bold 24px Georgia,serif}.title{font:italic 30px Georgia,serif}.header{font-size:16px;font-weight:700}.tool{font-size:17px}.note{font-size:15px;fill:#4b545e}.cell{stroke:#777f87;stroke-width:1}</style>
+<rect width="1520" height="545" fill="white"/>
+<text x="48" y="49" class="figure">Table 1</text>
+<text x="48" y="88" class="title">Comparison of EchoSense and related assistive tools</text>
+<rect x="38" y="120" width="252" height="66" fill="#e8ebee" class="cell"/>
+<text x="54" y="159" class="header">System</text>
+<rect x="290" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
+<text x="364.5" y="147" text-anchor="middle" class="header">Detect nearby<tspan x="364.5" dy="20">obstacles</tspan></text>
+<rect x="439" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
+<text x="513.5" y="147" text-anchor="middle" class="header">Play spatial<tspan x="513.5" dy="20">obstacle alerts</tspan></text>
+<rect x="588" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
+<text x="662.5" y="147" text-anchor="middle" class="header">Give turn-by-turn<tspan x="662.5" dy="20">route directions</tspan></text>
+<rect x="737" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
+<text x="811.5" y="147" text-anchor="middle" class="header">Read printed<tspan x="811.5" dy="20">text aloud</tspan></text>
+<rect x="886" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
+<text x="960.5" y="147" text-anchor="middle" class="header">Log supervised<tspan x="960.5" dy="20">practice results</tspan></text>
+<rect x="1035" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
+<text x="1109.5" y="147" text-anchor="middle" class="header">Record caregiver<tspan x="1109.5" dy="20">review clips</tspan></text>
+<rect x="1184" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
+<text x="1258.5" y="147" text-anchor="middle" class="header">Export practice<tspan x="1258.5" dy="20">reports</tspan></text>
+<rect x="1333" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
+<text x="1407.5" y="147" text-anchor="middle" class="header">Restore records<tspan x="1407.5" dy="20">from a backup</tspan></text>
+<rect x="38" y="186" width="252" height="52" fill="#f1f4f6" class="cell"/>
+<text x="54" y="218" class="tool" font-weight="700">EchoSense prototype</text>
+<rect x="290" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(364.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="439" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(513.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="588" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(662.5 212.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="737" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(811.5 212.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="886" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(960.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1035" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(1109.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1184" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(1258.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1333" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(1407.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="38" y="238" width="252" height="52" fill="white" class="cell"/>
+<text x="54" y="270" class="tool" font-weight="400">NOA by biped.ai [1]</text>
+<rect x="290" y="238" width="149" height="52" fill="white" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(364.5 264.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="439" y="238" width="149" height="52" fill="white" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(513.5 264.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="588" y="238" width="149" height="52" fill="white" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(662.5 264.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="737" y="238" width="149" height="52" fill="white" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(811.5 264.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="886" y="238" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(960.5 264.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1035" y="238" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1109.5 264.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1184" y="238" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1258.5 264.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1333" y="238" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1407.5 264.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="38" y="290" width="252" height="52" fill="white" class="cell"/>
+<text x="54" y="322" class="tool" font-weight="400">WeWALK Smart Cane 2 [2]</text>
+<rect x="290" y="290" width="149" height="52" fill="white" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(364.5 316.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="439" y="290" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(513.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="588" y="290" width="149" height="52" fill="white" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(662.5 316.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="737" y="290" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(811.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="886" y="290" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(960.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1035" y="290" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1109.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1184" y="290" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1258.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1333" y="290" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1407.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="38" y="342" width="252" height="52" fill="white" class="cell"/>
+<text x="54" y="374" class="tool" font-weight="400">Microsoft Seeing AI [3]</text>
+<rect x="290" y="342" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(364.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="439" y="342" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(513.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="588" y="342" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(662.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="737" y="342" width="149" height="52" fill="white" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(811.5 368.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="886" y="342" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(960.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1035" y="342" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1109.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1184" y="342" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1258.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1333" y="342" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1407.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="38" y="394" width="252" height="52" fill="white" class="cell"/>
+<text x="54" y="426" class="tool" font-weight="400">Lazarillo [4]</text>
+<rect x="290" y="394" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(364.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="439" y="394" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(513.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="588" y="394" width="149" height="52" fill="white" class="cell"/>
+<path d="M-8 0 L-2 6 L9 -6" transform="translate(662.5 420.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="737" y="394" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(811.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="886" y="394" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(960.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1035" y="394" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1109.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1184" y="394" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1258.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1333" y="394" width="149" height="52" fill="white" class="cell"/>
+<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1407.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="38" y="476" class="note">Check = documented or implemented. Cross = unavailable in the EchoSense prototype or unverified in the cited materials for the other tools.</text>
+<text x="38" y="505" class="note">[1] biped.ai NOA product overview and mobility guide.   [2] WeWALK Smart Cane 2 user manual.</text>
+<text x="38" y="527" class="note">[3] Microsoft Seeing AI product overview.   [4] Lazarillo App overview. Source links accompany the editable table.</text>
 </svg>

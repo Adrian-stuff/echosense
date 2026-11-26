@@ -20,17 +20,23 @@ The context diagram treats the assistive device and parent dashboard as a single
 
 See the [whole-system operational flowchart](system-flowchart.md) for decision paths, faults, and recovery.
 
+## Figure 3. Context-level diagram of NOA by biped.ai
+
+![NOA exchanges commands and feedback with the wearer, captures visual input from the surroundings, and uses external routing and AI services.](figures/noa-context-dfd.svg)
+
+This reconstruction places the NOA vest, companion app, and paired audio output inside one system boundary. The wearer supplies button commands, settings, and destinations. The system returns spatial obstacle alerts, spoken navigation, and scene descriptions. Google Maps and Google Gemini represent the external services identified by biped.ai. The arrows show functional exchanges at the system boundary. [NOA user manual](https://biped.ai/en/user-manual), [NOA orientation and mobility guide](https://www.biped.ai/en/o-m-guide/), [NOA product overview](https://biped.ai/).
+
 ## Table 1. Comparison of EchoSense and related assistive tools
 
-| System | Primary focus | Form and interface | Obstacle sensing | User feedback | Route guidance | Practice tracking | Caregiver records |
-|---|---|---|---|---|---|---|---|
-| **EchoSense prototype** | Obstacle assistance and supervised practice | Chest-mounted Kinect and local web dashboard | Depth-based obstacle and drop-off cues | Spatial tones and spoken alerts | No | Direction trials, goals, and reports | Local clips, notes, and ZIP backup |
-| NOA by biped.ai [1] | Wearable mobility assistance | Camera-equipped wearable and headphones | Camera-based obstacle detection | Spatial obstacle sounds and voice guidance | GPS directions | ND | ND |
-| WeWALK Smart Cane 2 [2] | Smart cane mobility and wayfinding | Electronic white cane and companion app | Above-chest sensor detection | Audio and vibration alerts | Via companion app | ND | ND |
-| Microsoft Seeing AI [3] | Text reading and scene description | Phone camera app | ND for real-time obstacle alerts | Spoken text and scene descriptions | ND | ND | ND |
-| Lazarillo [4] | Accessible wayfinding and exploration | Phone GPS app | ND for nearby obstacle alerts | Spoken directions and place announcements | Turn-by-turn routes | ND | ND |
+| System | Detect nearby obstacles | Play spatial obstacle alerts | Give turn-by-turn route directions | Read printed text aloud | Log supervised practice results | Record caregiver review clips | Export practice reports | Restore records from a backup |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **EchoSense prototype** | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ |
+| [NOA by biped.ai [1]](#figure-3-context-level-diagram-of-noa-by-bipedai) | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| WeWALK Smart Cane 2 [2] | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Microsoft Seeing AI [3] | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| Lazarillo [4] | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 
-**ND** means the reviewed product materials do not document the feature. The table compares feature coverage. EchoSense entries describe the implemented prototype. [Download the vector table](figures/echosense-comparison.svg).
+✓ = documented or implemented. ✗ = unavailable in the EchoSense prototype or unverified in the cited materials for the other tools. [Download the vector table](figures/echosense-comparison.svg).
 
 1. biped.ai. [NOA product overview](https://biped.ai/) and [orientation and mobility guide](https://www.biped.ai/en/o-m-guide/).
 2. WeWALK. [Smart Cane 2 user manual](https://support.wewalk.io/en/article/wewalk-smart-cane-2-users-manual/).
