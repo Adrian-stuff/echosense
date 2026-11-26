@@ -8,7 +8,7 @@ web
 
 ## Users
 
-Parents and caregivers of visually impaired children use the parent dashboard to review training and capture footage. Device developers and caregivers retain the existing console for fitting, simulation, and advanced controls.
+Parents and caregivers of children with visual and motor impairments use the parent dashboard to review training and capture footage. Device developers and caregivers retain the existing console for fitting, simulation, and advanced controls.
 
 ## Product Purpose
 
@@ -24,7 +24,7 @@ The parent app stores clips, snapshots, profiles, goals, and cached history in I
 
 ## Accessibility & Inclusion
 
-The device serves visually impaired users. Parent controls must have readable labels, keyboard access, visible focus, and screen-reader status messages. Training is adult-supervised and stationary; exercise error is not a mobility assessment.
+The device serves children with visual and motor impairments. Parent controls must have readable labels, keyboard access, visible focus, and screen-reader status messages. Training is adult-supervised and stationary; exercise error is not a mobility assessment.
 
 ## Evidence on Hand
 
