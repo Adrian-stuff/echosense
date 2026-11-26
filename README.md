@@ -1,7 +1,9 @@
 # Echo-Sense — device software, simulator and virtual Orange Pi
 
+**Research title:** *Design and Development of Echo-Sense: A Depth-Sensing Assistive Device with Spatial Audio and Parent Monitoring for Children with Visual and Motor Impairments in Barangay Maysan*
+
 Software for the Echo-Sense assistive device: a chest-mounted **Kinect v2** depth sensor
-and an **Orange Pi** that turn obstacles in front of a visually impaired user into
+and an **Orange Pi** that turn obstacles in front of a child with visual or motor impairments into
 **3D (HRTF) spatial audio** cues. The same program runs in three places:
 
 | Where | Depth comes from | Audio goes to | Command |
