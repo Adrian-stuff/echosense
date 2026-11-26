@@ -1,119 +1,293 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1520" height="545" viewBox="0 0 1520 545" role="img" aria-labelledby="title desc">
-<title id="title">Table 1. Comparison of EchoSense and related assistive tools</title>
-<desc id="desc">✓ = documented or implemented. ✗ = unavailable in the EchoSense prototype or unverified in the cited materials for the other tools. EchoSense prototype: Detect nearby obstacles, Play spatial obstacle alerts, Log supervised practice results, Record caregiver review clips, Export practice reports, Restore records from a backup. NOA by biped.ai [1]: Detect nearby obstacles, Play spatial obstacle alerts, Give turn-by-turn route directions, Read printed text aloud. WeWALK Smart Cane 2 [2]: Detect nearby obstacles, Give turn-by-turn route directions. Microsoft Seeing AI [3]: Read printed text aloud. Lazarillo [4]: Give turn-by-turn route directions.</desc>
-<style>text{fill:#20242a;font-family:Arial,Helvetica,sans-serif}.figure{font:bold 24px Georgia,serif}.title{font:italic 30px Georgia,serif}.header{font-size:16px;font-weight:700}.tool{font-size:17px}.note{font-size:15px;fill:#4b545e}.cell{stroke:#777f87;stroke-width:1}</style>
-<rect width="1520" height="545" fill="white"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1260" height="1036" viewBox="0 0 1260 1036" role="img" aria-labelledby="title desc">
+<title id="title">Table 1. Comparison of EchoSense and similar systems</title>
+<desc id="desc">EchoSense (proposed): Detects obstacles Yes, Head-level warning Yes, Spatial sound Yes, Hands-free Yes, Works without a phone Yes, Training mode Yes. Sound of Vision: Detects obstacles Yes, Head-level warning Yes, Spatial sound Partly, Hands-free Yes, Works without a phone Yes, Training mode Yes. The vOICe: Detects obstacles Partly, Head-level warning Partly, Spatial sound Partly, Hands-free Partly, Works without a phone Yes, Training mode Yes. NOA by biped.ai: Detects obstacles Yes, Head-level warning Yes, Spatial sound Partly, Hands-free Yes, Works without a phone No, Training mode No. .lumen Glasses: Detects obstacles Yes, Head-level warning Yes, Spatial sound No, Hands-free Yes, Works without a phone No, Training mode No. WeWALK Smart Cane 2: Detects obstacles Yes, Head-level warning Yes, Spatial sound No, Hands-free No, Works without a phone Yes, Training mode No. UltraCane: Detects obstacles Yes, Head-level warning Yes, Spatial sound No, Hands-free No, Works without a phone Yes, Training mode No. Glide by Glidance: Detects obstacles Yes, Head-level warning Yes, Spatial sound No, Hands-free No, Works without a phone Yes, Training mode No. Alcasid et al. (2022): Detects obstacles Yes, Head-level warning Yes, Spatial sound No, Hands-free Partly, Works without a phone Partly, Training mode No. Malubay et al. (2024): Detects obstacles Yes, Head-level warning Partly, Spatial sound No, Hands-free No, Works without a phone Yes, Training mode No. OrCam MyEye: Detects obstacles No, Head-level warning No, Spatial sound No, Hands-free Yes, Works without a phone Yes, Training mode No. Envision Glasses: Detects obstacles No, Head-level warning No, Spatial sound No, Hands-free Yes, Works without a phone Partly, Training mode No. Apple Magnifier Detection Mode: Detects obstacles Yes, Head-level warning No, Spatial sound No, Hands-free No, Works without a phone No, Training mode No. Microsoft Soundscape: Detects obstacles No, Head-level warning No, Spatial sound Partly, Hands-free Partly, Works without a phone No, Training mode No. Be My Eyes / Be My AI: Detects obstacles No, Head-level warning No, Spatial sound No, Hands-free Partly, Works without a phone No, Training mode No. Seeing AI: Detects obstacles No, Head-level warning No, Spatial sound No, Hands-free No, Works without a phone No, Training mode No. Google Lookout: Detects obstacles No, Head-level warning No, Spatial sound No, Hands-free No, Works without a phone No, Training mode No. Lazarillo: Detects obstacles No, Head-level warning No, Spatial sound No, Hands-free No, Works without a phone No, Training mode No. BlindSquare: Detects obstacles No, Head-level warning No, Spatial sound No, Hands-free No, Works without a phone No, Training mode No.</desc>
+<style>text{fill:#20242a;font-family:Arial,Helvetica,sans-serif}.figure{font:bold 24px Georgia,serif}.title{font:italic 30px Georgia,serif}.header{font-size:16px;font-weight:700}.tool{font-size:17px}.mark{font-size:20px}.note{font-size:15px;fill:#4b545e}.cell{stroke:#777f87;stroke-width:1}</style>
+<rect width="1260" height="1036" fill="white"/>
 <text x="48" y="49" class="figure">Table 1</text>
-<text x="48" y="88" class="title">Comparison of EchoSense and related assistive tools</text>
-<rect x="38" y="120" width="252" height="66" fill="#e8ebee" class="cell"/>
+<text x="48" y="88" class="title">Comparison of EchoSense and similar systems</text>
+<rect x="38" y="120" width="300" height="66" fill="#e8ebee" class="cell"/>
 <text x="54" y="159" class="header">System</text>
-<rect x="290" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
-<text x="364.5" y="147" text-anchor="middle" class="header">Detect nearby<tspan x="364.5" dy="20">obstacles</tspan></text>
-<rect x="439" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
-<text x="513.5" y="147" text-anchor="middle" class="header">Play spatial<tspan x="513.5" dy="20">obstacle alerts</tspan></text>
-<rect x="588" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
-<text x="662.5" y="147" text-anchor="middle" class="header">Give turn-by-turn<tspan x="662.5" dy="20">route directions</tspan></text>
-<rect x="737" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
-<text x="811.5" y="147" text-anchor="middle" class="header">Read printed<tspan x="811.5" dy="20">text aloud</tspan></text>
-<rect x="886" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
-<text x="960.5" y="147" text-anchor="middle" class="header">Log supervised<tspan x="960.5" dy="20">practice results</tspan></text>
-<rect x="1035" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
-<text x="1109.5" y="147" text-anchor="middle" class="header">Record caregiver<tspan x="1109.5" dy="20">review clips</tspan></text>
-<rect x="1184" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
-<text x="1258.5" y="147" text-anchor="middle" class="header">Export practice<tspan x="1258.5" dy="20">reports</tspan></text>
-<rect x="1333" y="120" width="149" height="66" fill="#e8ebee" class="cell"/>
-<text x="1407.5" y="147" text-anchor="middle" class="header">Restore records<tspan x="1407.5" dy="20">from a backup</tspan></text>
-<rect x="38" y="186" width="252" height="52" fill="#f1f4f6" class="cell"/>
-<text x="54" y="218" class="tool" font-weight="700">EchoSense prototype</text>
-<rect x="290" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(364.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="439" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(513.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="588" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(662.5 212.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="737" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(811.5 212.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="886" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(960.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1035" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(1109.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1184" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(1258.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1333" y="186" width="149" height="52" fill="#f1f4f6" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(1407.5 212.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="38" y="238" width="252" height="52" fill="white" class="cell"/>
-<text x="54" y="270" class="tool" font-weight="400">NOA by biped.ai [1]</text>
-<rect x="290" y="238" width="149" height="52" fill="white" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(364.5 264.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="439" y="238" width="149" height="52" fill="white" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(513.5 264.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="588" y="238" width="149" height="52" fill="white" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(662.5 264.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="737" y="238" width="149" height="52" fill="white" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(811.5 264.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="886" y="238" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(960.5 264.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1035" y="238" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1109.5 264.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1184" y="238" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1258.5 264.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1333" y="238" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1407.5 264.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="38" y="290" width="252" height="52" fill="white" class="cell"/>
-<text x="54" y="322" class="tool" font-weight="400">WeWALK Smart Cane 2 [2]</text>
-<rect x="290" y="290" width="149" height="52" fill="white" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(364.5 316.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="439" y="290" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(513.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="588" y="290" width="149" height="52" fill="white" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(662.5 316.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="737" y="290" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(811.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="886" y="290" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(960.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1035" y="290" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1109.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1184" y="290" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1258.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1333" y="290" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1407.5 316.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="38" y="342" width="252" height="52" fill="white" class="cell"/>
-<text x="54" y="374" class="tool" font-weight="400">Microsoft Seeing AI [3]</text>
-<rect x="290" y="342" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(364.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="439" y="342" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(513.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="588" y="342" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(662.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="737" y="342" width="149" height="52" fill="white" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(811.5 368.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="886" y="342" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(960.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1035" y="342" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1109.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1184" y="342" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1258.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1333" y="342" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1407.5 368.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="38" y="394" width="252" height="52" fill="white" class="cell"/>
-<text x="54" y="426" class="tool" font-weight="400">Lazarillo [4]</text>
-<rect x="290" y="394" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(364.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="439" y="394" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(513.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="588" y="394" width="149" height="52" fill="white" class="cell"/>
-<path d="M-8 0 L-2 6 L9 -6" transform="translate(662.5 420.0)" fill="none" stroke="#185846" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="737" y="394" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(811.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="886" y="394" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(960.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1035" y="394" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1109.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1184" y="394" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1258.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="1333" y="394" width="149" height="52" fill="white" class="cell"/>
-<path d="M-6 -6 L6 6 M6 -6 L-6 6" transform="translate(1407.5 420.0)" fill="none" stroke="#754343" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="38" y="476" class="note">Check = documented or implemented. Cross = unavailable in the EchoSense prototype or unverified in the cited materials for the other tools.</text>
-<text x="38" y="505" class="note">[1] biped.ai NOA product overview and mobility guide.   [2] WeWALK Smart Cane 2 user manual.</text>
-<text x="38" y="527" class="note">[3] Microsoft Seeing AI product overview.   [4] Lazarillo App overview. Source links accompany the editable table.</text>
+<rect x="338" y="120" width="150" height="66" fill="#e8ebee" class="cell"/>
+<text x="413.0" y="150" class="header" text-anchor="middle">Detects</text>
+<text x="413.0" y="168" class="header" text-anchor="middle">obstacles</text>
+<rect x="488" y="120" width="150" height="66" fill="#e8ebee" class="cell"/>
+<text x="563.0" y="150" class="header" text-anchor="middle">Head-level</text>
+<text x="563.0" y="168" class="header" text-anchor="middle">warning</text>
+<rect x="638" y="120" width="150" height="66" fill="#e8ebee" class="cell"/>
+<text x="713.0" y="159" class="header" text-anchor="middle">Spatial sound</text>
+<rect x="788" y="120" width="150" height="66" fill="#e8ebee" class="cell"/>
+<text x="863.0" y="159" class="header" text-anchor="middle">Hands-free</text>
+<rect x="938" y="120" width="150" height="66" fill="#e8ebee" class="cell"/>
+<text x="1013.0" y="150" class="header" text-anchor="middle">Works without a</text>
+<text x="1013.0" y="168" class="header" text-anchor="middle">phone</text>
+<rect x="1088" y="120" width="150" height="66" fill="#e8ebee" class="cell"/>
+<text x="1163.0" y="159" class="header" text-anchor="middle">Training mode</text>
+<rect x="38" y="186" width="300" height="40" fill="#f3f4f6" class="cell"/>
+<text x="54" y="212" class="tool" font-weight="700">EchoSense (proposed)</text>
+<rect x="338" y="186" width="150" height="40" fill="#f3f4f6" class="cell"/>
+<text x="413.0" y="213" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="488" y="186" width="150" height="40" fill="#f3f4f6" class="cell"/>
+<text x="563.0" y="213" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="638" y="186" width="150" height="40" fill="#f3f4f6" class="cell"/>
+<text x="713.0" y="213" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="788" y="186" width="150" height="40" fill="#f3f4f6" class="cell"/>
+<text x="863.0" y="213" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="938" y="186" width="150" height="40" fill="#f3f4f6" class="cell"/>
+<text x="1013.0" y="213" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="1088" y="186" width="150" height="40" fill="#f3f4f6" class="cell"/>
+<text x="1163.0" y="213" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="38" y="226" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="252" class="tool">Sound of Vision</text>
+<rect x="338" y="226" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="253" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="488" y="226" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="253" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="638" y="226" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="253" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="788" y="226" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="253" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="938" y="226" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="253" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="1088" y="226" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="253" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="38" y="266" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="292" class="tool">The vOICe</text>
+<rect x="338" y="266" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="293" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="488" y="266" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="293" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="638" y="266" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="293" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="788" y="266" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="293" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="938" y="266" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="293" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="1088" y="266" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="293" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="38" y="306" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="332" class="tool">NOA by biped.ai</text>
+<rect x="338" y="306" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="333" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="488" y="306" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="333" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="638" y="306" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="333" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="788" y="306" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="333" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="938" y="306" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="333" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="1088" y="306" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="333" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="346" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="372" class="tool">.lumen Glasses</text>
+<rect x="338" y="346" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="373" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="488" y="346" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="373" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="638" y="346" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="373" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="346" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="373" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="938" y="346" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="373" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="1088" y="346" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="373" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="386" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="412" class="tool">WeWALK Smart Cane 2</text>
+<rect x="338" y="386" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="413" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="488" y="386" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="413" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="638" y="386" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="413" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="386" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="413" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="938" y="386" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="413" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="1088" y="386" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="413" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="426" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="452" class="tool">UltraCane</text>
+<rect x="338" y="426" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="453" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="488" y="426" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="453" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="638" y="426" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="453" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="426" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="453" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="938" y="426" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="453" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="1088" y="426" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="453" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="466" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="492" class="tool">Glide by Glidance</text>
+<rect x="338" y="466" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="493" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="488" y="466" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="493" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="638" y="466" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="493" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="466" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="493" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="938" y="466" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="493" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="1088" y="466" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="493" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="506" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="532" class="tool">Alcasid et al. (2022)</text>
+<rect x="338" y="506" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="533" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="488" y="506" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="533" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="638" y="506" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="533" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="506" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="533" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="938" y="506" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="533" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="1088" y="506" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="533" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="546" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="572" class="tool">Malubay et al. (2024)</text>
+<rect x="338" y="546" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="573" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="488" y="546" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="573" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="638" y="546" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="573" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="546" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="573" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="938" y="546" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="573" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="1088" y="546" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="573" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="586" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="612" class="tool">OrCam MyEye</text>
+<rect x="338" y="586" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="613" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="488" y="586" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="613" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="638" y="586" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="613" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="586" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="613" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="938" y="586" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="613" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="1088" y="586" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="613" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="626" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="652" class="tool">Envision Glasses</text>
+<rect x="338" y="626" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="653" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="488" y="626" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="653" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="638" y="626" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="653" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="626" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="653" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="938" y="626" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="653" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="1088" y="626" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="653" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="666" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="692" class="tool">Apple Magnifier Detection Mode</text>
+<rect x="338" y="666" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="693" class="mark" text-anchor="middle" style="fill:#20242a">✓</text>
+<rect x="488" y="666" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="693" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="638" y="666" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="693" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="666" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="693" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="938" y="666" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="693" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="1088" y="666" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="693" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="706" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="732" class="tool">Microsoft Soundscape</text>
+<rect x="338" y="706" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="733" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="488" y="706" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="733" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="638" y="706" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="733" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="788" y="706" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="733" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="938" y="706" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="733" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="1088" y="706" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="733" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="746" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="772" class="tool">Be My Eyes / Be My AI</text>
+<rect x="338" y="746" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="773" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="488" y="746" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="773" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="638" y="746" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="773" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="746" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="773" class="mark" text-anchor="middle" style="fill:#4b545e">◐</text>
+<rect x="938" y="746" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="773" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="1088" y="746" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="773" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="786" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="812" class="tool">Seeing AI</text>
+<rect x="338" y="786" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="813" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="488" y="786" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="813" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="638" y="786" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="813" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="786" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="813" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="938" y="786" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="813" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="1088" y="786" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="813" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="826" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="852" class="tool">Google Lookout</text>
+<rect x="338" y="826" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="853" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="488" y="826" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="853" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="638" y="826" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="853" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="826" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="853" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="938" y="826" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="853" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="1088" y="826" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="853" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="866" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="892" class="tool">Lazarillo</text>
+<rect x="338" y="866" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="893" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="488" y="866" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="893" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="638" y="866" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="893" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="866" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="893" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="938" y="866" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="893" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="1088" y="866" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="893" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="38" y="906" width="300" height="40" fill="white" class="cell"/>
+<text x="54" y="932" class="tool">BlindSquare</text>
+<rect x="338" y="906" width="150" height="40" fill="white" class="cell"/>
+<text x="413.0" y="933" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="488" y="906" width="150" height="40" fill="white" class="cell"/>
+<text x="563.0" y="933" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="638" y="906" width="150" height="40" fill="white" class="cell"/>
+<text x="713.0" y="933" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="788" y="906" width="150" height="40" fill="white" class="cell"/>
+<text x="863.0" y="933" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="938" y="906" width="150" height="40" fill="white" class="cell"/>
+<text x="1013.0" y="933" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<rect x="1088" y="906" width="150" height="40" fill="white" class="cell"/>
+<text x="1163.0" y="933" class="mark" text-anchor="middle" style="fill:#8a9199">✗</text>
+<text x="48" y="980" class="note">✓ = offered and documented in the cited source. ◐ = offered in a limited form. ✗ = not offered, or not documented in the sources reviewed.</text>
+<text x="48" y="1004" class="note">EchoSense marks describe its designed functions, which are not yet field-tested. Sources are listed in docs/system-diagrams.md.</text>
 </svg>
